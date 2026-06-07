@@ -6,26 +6,30 @@ use App\Http\Controllers\Admin\TemplateController;
 use App\Http\Controllers\Admin\EmailListController;
 use App\Http\Controllers\Admin\CampaignController;
 use App\Http\Controllers\Admin\EmailLogController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\UnsubscribeController;
 
 Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// ── Unsubscribe (public) ──────────────────────────────────────────────────────
+Route::get('/unsubscribe/{token}',  [UnsubscribeController::class, 'show'])->name('unsubscribe.show');
+Route::post('/unsubscribe/{token}', [UnsubscribeController::class, 'process'])->name('unsubscribe.process');
+
 // ── Auth (guest only) ─────────────────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
     Route::get('/login',  [LoginController::class, 'showLogin'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+    Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
 });
 
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->middleware('auth');
 
 // ── Admin (auth protected) ────────────────────────────────────────────────────
-Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(function () {
 
-    Route::get('/dashboard', function () {
-        return view('admin.dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Email Templates
     Route::resource('templates', TemplateController::class)->except(['show']);
@@ -38,7 +42,8 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::get('/email-lists/sample',   [EmailListController::class, 'sampleCsv'])->name('email-lists.sample');
 
     // Email Logs
-    Route::get('/email-logs', [EmailLogController::class, 'index'])->name('email-logs.index');
+    Route::get('/email-logs',        [EmailLogController::class, 'index'])->name('email-logs.index');
+    Route::get('/email-logs/export', [EmailLogController::class, 'export'])->name('email-logs.export');
 
     // Settings
     Route::get('/settings',                           [SettingsController::class, 'index'])->name('settings.index');
@@ -57,6 +62,8 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::get('/campaigns/create',                   [CampaignController::class, 'create'])->name('campaigns.create');
     Route::post('/campaigns',                         [CampaignController::class, 'store'])->name('campaigns.store');
     Route::get('/campaigns/{campaign}',               [CampaignController::class, 'show'])->name('campaigns.show');
+    Route::get('/campaigns/{campaign}/edit',          [CampaignController::class, 'edit'])->name('campaigns.edit');
+    Route::put('/campaigns/{campaign}',               [CampaignController::class, 'update'])->name('campaigns.update');
     Route::post('/campaigns/{campaign}/start',        [CampaignController::class, 'start'])->name('campaigns.start');
     Route::post('/campaigns/{campaign}/pause',        [CampaignController::class, 'pause'])->name('campaigns.pause');
     Route::post('/campaigns/{campaign}/resume',       [CampaignController::class, 'resume'])->name('campaigns.resume');

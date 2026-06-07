@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EmailGroup;
 use App\Models\EmailList;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class EmailListController extends Controller
 {
@@ -46,36 +47,38 @@ class EmailListController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'csv_file'   => 'required|file|mimes:csv,txt|max:5120',
-            'list_name'  => 'required|string|max:255',
+            'csv_file'  => 'required|file|mimes:csv,txt|max:51200', // 50 MB
+            'list_name' => 'required|string|max:255',
         ]);
 
-        // Find or create the email group
+        set_time_limit(300); // 5-minute budget for large files
+
         $group = EmailGroup::firstOrCreate(
             ['name' => trim($request->list_name)],
             ['description' => 'Imported on ' . now()->format('Y-m-d H:i')]
         );
 
+        // One query: pull all known emails into a hash-map for O(1) lookups.
+        // This also covers within-file duplicates — we add each accepted email here.
+        $seen = DB::table('email_lists')
+            ->pluck('email')
+            ->flip()
+            ->all(); // ['addr@x.com' => 0, ...]
+
         $handle = fopen($request->file('csv_file')->getRealPath(), 'r');
 
-        $rows = [];
-        while (($row = fgetcsv($handle)) !== false) {
-            $cleaned = array_map('trim', $row);
-            if (!empty(array_filter($cleaned))) {
-                $rows[] = $cleaned;
-            }
-        }
-        fclose($handle);
-
-        if (empty($rows)) {
+        // Read the first row to detect whether it is a header.
+        $firstRow = fgetcsv($handle);
+        if ($firstRow === false) {
+            fclose($handle);
             return back()->withErrors(['csv_file' => 'The CSV file is empty.']);
         }
+        $firstRow   = array_map('trim', $firstRow);
+        $firstLower = array_map('strtolower', $firstRow);
 
-        // Auto-detect header and column positions
-        $emailCol   = null;
-        $nameCol    = null;
-        $startRow   = 0;
-        $firstLower = array_map('strtolower', $rows[0]);
+        $emailCol      = null;
+        $nameCol       = null;
+        $firstRowIsData = false;
 
         foreach ($firstLower as $i => $cell) {
             if (in_array($cell, ['email', 'email address', 'e-mail', 'emailaddress', 'mail'])) {
@@ -86,49 +89,79 @@ class EmailListController extends Controller
             }
         }
 
-        if ($emailCol !== null) {
-            $startRow = 1;
-        } else {
-            foreach ($rows[0] as $i => $cell) {
+        if ($emailCol === null) {
+            // No header keywords found — treat the first row as data.
+            $firstRowIsData = true;
+            foreach ($firstRow as $i => $cell) {
                 if (filter_var($cell, FILTER_VALIDATE_EMAIL)) {
                     $emailCol = $i;
-                    $nameCol  = ($i === 0 && count($rows[0]) > 1) ? 1 : ($i > 0 ? 0 : null);
+                    $nameCol  = ($i === 0 && count($firstRow) > 1) ? 1 : ($i > 0 ? 0 : null);
                     break;
                 }
             }
             if ($emailCol === null) {
                 $emailCol = 0;
-                $nameCol  = count($rows[0]) > 1 ? 1 : null;
+                $nameCol  = count($firstRow) > 1 ? 1 : null;
             }
         }
 
         $imported   = 0;
         $duplicates = 0;
         $invalid    = 0;
+        $batch      = [];
+        $batchSize  = 500;
+        $now        = now()->toDateTimeString();
 
-        for ($i = $startRow; $i < count($rows); $i++) {
-            $row   = $rows[$i];
-            $email = strtolower($row[$emailCol] ?? '');
-            $name  = $nameCol !== null ? ($row[$nameCol] ?? null) : null;
-            $name  = $name ? trim($name) : null;
+        $processRow = function (array $row) use (
+            $emailCol, $nameCol, $group, $now,
+            &$seen, &$imported, &$duplicates, &$invalid, &$batch
+        ): void {
+            $email = strtolower(trim($row[$emailCol] ?? ''));
+            $name  = $nameCol !== null ? (trim($row[$nameCol] ?? '') ?: null) : null;
 
             if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $invalid++;
-                continue;
+                return;
             }
 
-            if (EmailList::where('email', $email)->exists()) {
+            if (isset($seen[$email])) {
                 $duplicates++;
-                continue;
+                return;
             }
 
-            EmailList::create([
-                'email'    => $email,
-                'name'     => $name ?: null,
-                'status'   => 'pending',
-                'group_id' => $group->id,
-            ]);
+            $seen[$email] = true; // Guard both DB duplicates and within-file duplicates
+
+            $batch[] = [
+                'email'      => $email,
+                'name'       => $name,
+                'status'     => 'pending',
+                'group_id'   => $group->id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
             $imported++;
+        };
+
+        if ($firstRowIsData) {
+            $processRow($firstRow);
+        }
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $row = array_map('trim', $row);
+            if (!array_filter($row)) continue; // skip blank lines
+
+            $processRow($row);
+
+            if (count($batch) >= $batchSize) {
+                EmailList::insert($batch);
+                $batch = [];
+            }
+        }
+
+        fclose($handle);
+
+        if (!empty($batch)) {
+            EmailList::insert($batch);
         }
 
         return redirect()->route('admin.email-lists.index')

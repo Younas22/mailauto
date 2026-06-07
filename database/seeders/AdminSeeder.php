@@ -10,12 +10,24 @@ class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        User::firstOrCreate(
-            ['email' => 'admin@mailauto.com'],
+        $email    = env('ADMIN_EMAIL',    'admin@mailauto.com');
+        $name     = env('ADMIN_NAME',     'Admin');
+        $password = env('ADMIN_PASSWORD', 'password');
+
+        $user = User::firstOrCreate(
+            ['email' => $email],
             [
-                'name'     => 'Admin',
-                'password' => Hash::make('password'),
+                'name'     => $name,
+                'role'     => 'admin',
+                'password' => Hash::make($password),
             ]
         );
+
+        // Ensure existing users seeded before role column existed have admin role
+        if ($user->wasRecentlyCreated === false && $user->role !== 'admin') {
+            $user->update(['role' => 'admin']);
+        }
+
+        $this->command->info("Admin user ready: {$email}");
     }
 }

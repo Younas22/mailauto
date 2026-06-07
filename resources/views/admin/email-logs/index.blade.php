@@ -67,57 +67,105 @@
 {{-- Filters & Search Bar --}}
 <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-4">
     <form method="GET" action="{{ route('admin.email-logs.index') }}"
-          class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 px-4 py-3.5">
+          class="flex flex-col gap-3 px-4 py-3.5">
 
-        {{-- Search --}}
-        <div class="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
-            <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
-            <input type="text" name="search" value="{{ request('search') }}"
-                   placeholder="Search by email address…"
-                   class="bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 outline-none w-full" />
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {{-- Search --}}
+            <div class="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+                <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}"
+                       placeholder="Search by email address…"
+                       class="bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 outline-none w-full" />
+            </div>
+
+            {{-- Status filter --}}
+            <div class="relative flex-shrink-0">
+                <select name="status"
+                        class="appearance-none w-full sm:w-40 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                               text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer
+                               focus:border-brand-400 transition">
+                    <option value="" {{ !request('status') ? 'selected' : '' }}>All Statuses</option>
+                    <option value="sent"   {{ request('status') === 'sent'   ? 'selected' : '' }}>Sent</option>
+                    <option value="failed" {{ request('status') === 'failed' ? 'selected' : '' }}>Failed</option>
+                </select>
+                <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+
+            {{-- Campaign filter --}}
+            <div class="relative flex-shrink-0">
+                <select name="campaign_id"
+                        class="appearance-none w-full sm:w-44 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                               text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer
+                               focus:border-brand-400 transition">
+                    <option value="">All Campaigns</option>
+                    @foreach($campaigns as $c)
+                    <option value="{{ $c->id }}" {{ request('campaign_id') == $c->id ? 'selected' : '' }}>
+                        {{ Str::limit($c->name, 26) }}
+                    </option>
+                    @endforeach
+                </select>
+                <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
         </div>
 
-        {{-- Status filter --}}
-        <div class="relative flex-shrink-0">
-            <select name="status"
-                    class="appearance-none w-full sm:w-44 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
-                           text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer
-                           focus:border-brand-400 transition">
-                <option value="" {{ !request('status') ? 'selected' : '' }}>All Statuses</option>
-                <option value="sent"   {{ request('status') === 'sent'   ? 'selected' : '' }}>Sent</option>
-                <option value="failed" {{ request('status') === 'failed' ? 'selected' : '' }}>Failed</option>
-            </select>
-            <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-        </div>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {{-- Date from --}}
+            <div class="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+                <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <input type="date" name="date_from" value="{{ request('date_from') }}"
+                       class="bg-transparent text-sm text-slate-700 dark:text-slate-200 outline-none w-full" />
+            </div>
+            <span class="text-xs text-slate-400 dark:text-slate-500 text-center flex-shrink-0">to</span>
+            <div class="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+                <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <input type="date" name="date_to" value="{{ request('date_to') }}"
+                       class="bg-transparent text-sm text-slate-700 dark:text-slate-200 outline-none w-full" />
+            </div>
 
-        {{-- Actions --}}
-        <div class="flex items-center gap-2 flex-shrink-0">
-            <button type="submit"
-                    class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-brand-200/30">
-                Filter
-            </button>
-            @if(request('search') || request('status'))
-            <a href="{{ route('admin.email-logs.index') }}"
-               class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700
-                      text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition border border-slate-200 dark:border-slate-700">
-                Clear
-            </a>
-            @endif
+            {{-- Actions --}}
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <button type="submit"
+                        class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-brand-200/30">
+                    Filter
+                </button>
+                @if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
+                <a href="{{ route('admin.email-logs.index') }}"
+                   class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700
+                          text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition border border-slate-200 dark:border-slate-700">
+                    Clear
+                </a>
+                @endif
+                <a href="{{ route('admin.email-logs.export', request()->query()) }}"
+                   class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    CSV
+                </a>
+            </div>
         </div>
     </form>
 </div>
 
 {{-- Results count --}}
-@if(request('search') || request('status'))
+@if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
 <p class="text-xs text-slate-500 dark:text-slate-400 mb-3 px-1">
     Showing <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $logs->total() }}</span>
     result{{ $logs->total() !== 1 ? 's' : '' }}
     @if(request('search')) for <span class="font-semibold text-slate-700 dark:text-slate-300">"{{ request('search') }}"</span>@endif
     @if(request('status')) with status <span class="font-semibold text-slate-700 dark:text-slate-300">{{ request('status') }}</span>@endif
+    @if(request('campaign_id')) in campaign <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $campaigns->firstWhere('id', request('campaign_id'))?->name ?? '#'.request('campaign_id') }}</span>@endif
+    @if(request('date_from') || request('date_to')) from <span class="font-semibold text-slate-700 dark:text-slate-300">{{ request('date_from', '…') }}</span> to <span class="font-semibold text-slate-700 dark:text-slate-300">{{ request('date_to', 'today') }}</span>@endif
 </p>
 @endif
 
@@ -135,13 +183,13 @@
         </div>
         <p class="text-base font-bold text-slate-700 dark:text-slate-300 mb-1">No email logs found</p>
         <p class="text-sm text-slate-400 dark:text-slate-500 max-w-xs">
-            @if(request('search') || request('status'))
+            @if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
                 No logs match your current filters. Try adjusting your search.
             @else
                 Email logs will appear here once campaigns start sending.
             @endif
         </p>
-        @if(request('search') || request('status'))
+        @if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
         <a href="{{ route('admin.email-logs.index') }}"
            class="mt-4 text-sm font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition">
             Clear filters

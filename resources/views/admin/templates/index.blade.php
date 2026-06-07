@@ -26,7 +26,7 @@
 @endif
 
 {{-- Header bar --}}
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
     <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center">
             <svg class="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,6 +45,46 @@
         </svg>
         New Template
     </a>
+</div>
+
+{{-- Search & Filter bar --}}
+<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-5">
+    <form method="GET" action="{{ route('admin.templates.index') }}"
+          class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 px-4 py-3.5">
+        <div class="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+            <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input type="text" name="search" value="{{ request('search') }}"
+                   placeholder="Search by title or subject…"
+                   class="bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 outline-none w-full" />
+        </div>
+        <div class="relative flex-shrink-0">
+            <select name="status"
+                    class="appearance-none w-full sm:w-40 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                           text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer focus:border-brand-400 transition">
+                <option value="">All Statuses</option>
+                <option value="active"   {{ request('status') === 'active'   ? 'selected' : '' }}>Active</option>
+                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+            </select>
+            <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+            <button type="submit"
+                    class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                Search
+            </button>
+            @if(request('search') || request('status'))
+            <a href="{{ route('admin.templates.index') }}"
+               class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700
+                      text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition border border-slate-200 dark:border-slate-700">
+                Clear
+            </a>
+            @endif
+        </div>
+    </form>
 </div>
 
 {{-- Desktop table --}}
@@ -89,7 +129,7 @@
                 </td>
                 <td class="px-6 py-4 text-slate-400 dark:text-slate-500 text-xs">{{ $template->created_at->format('M d, Y') }}</td>
                 <td class="px-6 py-4">
-                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div class="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <a href="{{ route('admin.templates.edit', $template) }}"
                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 hover:bg-brand-100 dark:hover:bg-brand-900/30 rounded-lg transition">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

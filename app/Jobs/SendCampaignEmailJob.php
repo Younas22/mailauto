@@ -7,21 +7,25 @@ use App\Models\Campaign;
 use App\Models\CampaignLog;
 use App\Models\EmailList;
 use App\Models\EmailTemplate;
+use App\Models\Setting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Throwable;
 
 class SendCampaignEmailJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    // Large enough to survive ~41 hours of pause (500 × 5 min) plus send retries.
+    public int $tries   = 500;
     public int $backoff = 120;
     public int $timeout = 60;
 
@@ -30,32 +34,53 @@ class SendCampaignEmailJob implements ShouldQueue
         public int $emailListId
     ) {}
 
+    // Controls how many *thrown* exceptions (actual send failures) are allowed.
+    // Pause releases don't throw, so they don't count toward this limit.
+    public function maxExceptions(): int
+    {
+        try {
+            return Setting::get('campaign_retry_failed', '1') === '1' ? 3 : 1;
+        } catch (Throwable) {
+            return 3;
+        }
+    }
+
     public function handle(): void
     {
+        // Always re-apply DB mail config so queue workers use the correct mailer,
+        // not whatever was set in .env at worker-boot time.
+        Setting::applyMailConfig();
+
         $campaign  = Campaign::find($this->campaignId);
         $emailItem = EmailList::find($this->emailListId);
 
         if (!$campaign || !$emailItem) return;
 
-        // If paused, release back to queue after 60 s and wait
         if ($campaign->status === 'paused') {
-            $this->release(60);
+            $this->release(300); // Re-check every 5 min; doesn't count as an exception
             return;
         }
 
-        // If campaign was cancelled or completed externally, skip
-        if (!in_array($campaign->status, ['running'])) return;
+        if ($campaign->status !== 'running') return;
 
-        // Rate-limit: at most 1 email per second across all workers
-        $key = "campaign:{$this->campaignId}:rate";
-        if (RateLimiter::tooManyAttempts($key, 1)) {
-            $this->release(RateLimiter::availableIn($key) + 1);
+        // Enforce the global daily send limit before touching the rate limiter
+        if (!$this->withinDailyLimit()) {
+            $this->release(3600); // re-queue for 1 hour later
             return;
         }
-        RateLimiter::hit($key, 1);
 
-        // Pick a random active template
-        $template = EmailTemplate::where('status', 'active')->inRandomOrder()->first();
+        // Rate-limit: at most 1 email per second across all workers for this campaign
+        $rateKey = "campaign:{$this->campaignId}:rate";
+        if (RateLimiter::tooManyAttempts($rateKey, 1)) {
+            $this->release(RateLimiter::availableIn($rateKey) + 1);
+            return;
+        }
+        RateLimiter::hit($rateKey, 1);
+
+        // Template selection: random rotation only when the setting is enabled
+        $useRandom = Setting::get('campaign_random_rotation', '0') === '1';
+        $query     = EmailTemplate::where('status', 'active');
+        $template  = $useRandom ? $query->inRandomOrder()->first() : $query->first();
 
         if (!$template) {
             $this->logResult($campaign->id, $emailItem, null, 'failed', 'No active templates found');
@@ -64,18 +89,37 @@ class SendCampaignEmailJob implements ShouldQueue
             return;
         }
 
+        // Ensure the contact has an unsubscribe token before sending
+        if (!$emailItem->getRawOriginal('unsubscribe_token')) {
+            $token = Str::random(64);
+            $emailItem->updateQuietly(['unsubscribe_token' => $token]);
+            $emailItem->setRawAttributes(array_merge($emailItem->getRawOriginal(), ['unsubscribe_token' => $token]));
+        }
+
         try {
             Mail::to($emailItem->email, $emailItem->name ?? '')
-                ->send(new CampaignMail($template, $emailItem->name ?? ''));
+                ->send(new CampaignMail($template, $emailItem->name ?? '', $emailItem->getRawOriginal('unsubscribe_token') ?? ''));
 
             $emailItem->update(['status' => 'sent']);
             $this->logResult($campaign->id, $emailItem, $template->id, 'sent');
             $campaign->increment('sent_count');
         } catch (Throwable $e) {
-            $emailItem->update(['status' => 'failed']);
-            $this->logResult($campaign->id, $emailItem, $template->id, 'failed', $e->getMessage());
-            $campaign->increment('failed_count');
-            Log::error("Campaign [{$this->campaignId}] failed for {$emailItem->email}: " . $e->getMessage());
+            $retryEnabled = Setting::get('campaign_retry_failed', '1') === '1';
+
+            if (!$retryEnabled) {
+                // No retry: permanently fail this email now
+                $emailItem->update(['status' => 'failed']);
+                $this->logResult($campaign->id, $emailItem, $template->id, 'failed', $e->getMessage());
+                $campaign->increment('failed_count');
+                Log::error("Campaign [{$this->campaignId}] permanently failed for {$emailItem->email}: " . $e->getMessage());
+                $this->checkCompletion($campaign);
+                return;
+            }
+
+            // Retry enabled: log the attempt and re-throw so Laravel retries.
+            // maxExceptions() caps send-failure retries at 3; failed() handles the final failure.
+            Log::warning("Campaign [{$this->campaignId}] send attempt {$this->attempts()} failed for {$emailItem->email}: " . $e->getMessage());
+            throw $e;
         }
 
         $this->checkCompletion($campaign);
@@ -88,10 +132,33 @@ class SendCampaignEmailJob implements ShouldQueue
 
         if (!$emailItem || !$campaign) return;
 
+        // Only handle here when retry-enabled path exhausted maxExceptions.
+        // The no-retry path marks the email inside handle() and returns early,
+        // so we must not double-count sent or already-failed emails.
+        if (in_array($emailItem->status, ['sent', 'failed'])) return;
+
         $emailItem->update(['status' => 'failed']);
         $this->logResult($campaign->id, $emailItem, null, 'failed', $exception->getMessage());
         $campaign->increment('failed_count');
         $this->checkCompletion($campaign);
+    }
+
+    // Atomically increment the daily counter and return false when the limit is exceeded.
+    // Cache key is date-scoped so the counter resets automatically at midnight.
+    private function withinDailyLimit(): bool
+    {
+        $limit = (int) Setting::get('campaign_daily_limit', 500);
+        $key   = 'mailauto:daily_sent:' . now()->format('Y-m-d');
+
+        Cache::add($key, 0, now()->endOfDay()); // no-op if key already exists
+        $count = Cache::increment($key);
+
+        if ($count > $limit) {
+            Cache::decrement($key);
+            return false;
+        }
+
+        return true;
     }
 
     private function logResult(int $campaignId, EmailList $emailItem, ?int $templateId, string $status, ?string $error = null): void

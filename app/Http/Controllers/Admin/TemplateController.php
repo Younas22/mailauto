@@ -8,9 +8,23 @@ use Illuminate\Http\Request;
 
 class TemplateController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $templates = EmailTemplate::latest()->paginate(10);
+        $query = EmailTemplate::latest();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('subject', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status') && in_array($request->status, ['active', 'inactive'])) {
+            $query->where('status', $request->status);
+        }
+
+        $templates = $query->paginate(10)->withQueryString();
         return view('admin.templates.index', compact('templates'));
     }
 

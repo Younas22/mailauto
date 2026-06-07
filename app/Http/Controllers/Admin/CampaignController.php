@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessCampaignChunkJob;
 use App\Jobs\SendCampaignEmailJob;
 use App\Models\Campaign;
 use App\Models\EmailGroup;
 use App\Models\EmailList;
 use App\Models\EmailTemplate;
+use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,17 +73,52 @@ class CampaignController extends Controller
         return view('admin.campaigns.show', compact('campaign', 'recentLogs'));
     }
 
+    public function edit(Campaign $campaign): View
+    {
+        if (!in_array($campaign->status, ['draft', 'paused'])) {
+            return redirect()->route('admin.campaigns.show', $campaign)
+                ->with('error', 'Only draft or paused campaigns can be edited.');
+        }
+
+        $emailGroups = EmailGroup::withCount(['emails', 'pendingEmails'])->get();
+
+        return view('admin.campaigns.edit', compact('campaign', 'emailGroups'));
+    }
+
+    public function update(Request $request, Campaign $campaign): RedirectResponse
+    {
+        if (!in_array($campaign->status, ['draft', 'paused'])) {
+            return back()->with('error', 'Only draft or paused campaigns can be edited.');
+        }
+
+        $data = $request->validate([
+            'name'           => 'required|string|max:255',
+            'email_group_id' => 'required|exists:email_groups,id',
+            'delay_minutes'  => 'required|integer|min:0|max:1440',
+        ]);
+
+        $group = EmailGroup::findOrFail($data['email_group_id']);
+        $data['total_emails'] = $group->pendingEmails()->count();
+
+        $campaign->update($data);
+
+        return redirect()
+            ->route('admin.campaigns.show', $campaign)
+            ->with('success', 'Campaign updated successfully.');
+    }
+
     public function start(Campaign $campaign): RedirectResponse
     {
         if (!in_array($campaign->status, ['draft', 'paused', 'failed'])) {
             return back()->with('error', 'Campaign is already running or completed.');
         }
 
-        $pendingEmails = EmailList::where('group_id', $campaign->email_group_id)
+        // COUNT only — never load 50k rows into memory for a size check
+        $pendingCount = EmailList::where('group_id', $campaign->email_group_id)
             ->where('status', 'pending')
-            ->get();
+            ->count();
 
-        if ($pendingEmails->isEmpty()) {
+        if ($pendingCount === 0) {
             return back()->with('error', 'No pending emails in this list. All may have already been sent.');
         }
 
@@ -89,20 +126,28 @@ class CampaignController extends Controller
             return back()->with('error', 'No active templates found. Please create at least one active template first.');
         }
 
+        $maxPerCampaign = (int) Setting::get('campaign_max_per_campaign', 10000);
+        if ($pendingCount > $maxPerCampaign) {
+            return back()->with('error', "This campaign has {$pendingCount} pending emails which exceeds the configured limit of {$maxPerCampaign}. Reduce the group size or increase the limit in Settings → Campaign.");
+        }
+
+        $delay = $campaign->delay_minutes > 0
+            ? $campaign->delay_minutes
+            : (int) Setting::get('campaign_delay', 5);
+
         $campaign->update([
             'status'       => 'running',
-            'total_emails' => $pendingEmails->count(),
+            'total_emails' => $pendingCount,
             'started_at'   => $campaign->started_at ?? now(),
         ]);
 
-        $delay = (int) $campaign->delay_minutes;
+        // Dispatch a single chunk-dispatcher job rather than flooding the queue with
+        // one job per email. Each chunk job fetches the next slice, dispatches its
+        // send jobs, then chains the following chunk dispatcher — keeping at most
+        // chunkSize + 1 jobs in the queue at any time.
+        ProcessCampaignChunkJob::dispatch($campaign->id);
 
-        foreach ($pendingEmails as $index => $emailItem) {
-            SendCampaignEmailJob::dispatch($campaign->id, $emailItem->id)
-                ->delay(now()->addMinutes($index * $delay));
-        }
-
-        return back()->with('success', "Campaign launched! {$pendingEmails->count()} emails queued with {$delay} min delay between each.");
+        return back()->with('success', "Campaign launched! {$pendingCount} emails will be queued in chunks with {$delay} min delay between each.");
     }
 
     public function pause(Campaign $campaign): RedirectResponse

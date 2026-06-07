@@ -99,6 +99,16 @@
             </form>
             @endif
 
+            @if(in_array($campaign->status, ['draft', 'paused']))
+            <a href="{{ route('admin.campaigns.edit', $campaign) }}"
+               class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/20 text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 border border-slate-200 dark:border-slate-700 hover:border-brand-200 dark:hover:border-brand-800 text-sm font-bold rounded-xl transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit
+            </a>
+            @endif
+
             <form method="POST" action="{{ route('admin.campaigns.destroy', $campaign) }}"
                   onsubmit="return confirm('Delete this campaign and all its logs?')">
                 @csrf @method('DELETE')

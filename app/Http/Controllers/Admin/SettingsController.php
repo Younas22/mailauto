@@ -79,7 +79,7 @@ class SettingsController extends Controller
     {
         $request->validate(['test_to' => 'required|email']);
 
-        $this->applyMailConfig();
+        Setting::applyMailConfig();
 
         try {
             Mail::raw('This is a test email from MailAuto. Your mail configuration is working correctly!', function ($msg) use ($request) {
@@ -193,19 +193,4 @@ class SettingsController extends Controller
         return back()->with('success_security', 'All other sessions have been logged out.');
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    private function applyMailConfig(): void
-    {
-        config([
-            'mail.default'                        => Setting::get('mail_driver', 'smtp'),
-            'mail.mailers.smtp.host'              => Setting::get('smtp_host'),
-            'mail.mailers.smtp.port'              => Setting::get('smtp_port', 587),
-            'mail.mailers.smtp.username'          => Setting::get('smtp_username'),
-            'mail.mailers.smtp.password'          => Setting::get('smtp_password'),
-            'mail.mailers.smtp.encryption'        => Setting::get('smtp_encryption', 'tls'),
-            'mail.from.address'                   => Setting::get('mail_from_email'),
-            'mail.from.name'                      => Setting::get('mail_from_name'),
-        ]);
-    }
 }

@@ -480,6 +480,20 @@
             </div>
         </header>
 
+        {{-- APP_DEBUG production warning --}}
+        @if(config('app.debug') && app()->isProduction())
+        <div class="bg-red-600 text-white text-center text-sm font-semibold py-2 px-4 flex items-center justify-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            WARNING: APP_DEBUG is enabled in production. Set APP_DEBUG=false in your .env file immediately.
+        </div>
+        @elseif(config('app.debug') && !app()->isProduction())
+        <div class="bg-amber-500 text-white text-center text-xs font-semibold py-1.5 px-4">
+            Debug mode is ON — disable before deploying to production (APP_DEBUG=false)
+        </div>
+        @endif
+
         {{-- PAGE CONTENT --}}
         <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             @yield('content')
@@ -496,5 +510,23 @@
     </div>
 
     @stack('scripts')
+
+    {{-- Global: form submit loading states --}}
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('form').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                var btn = form.querySelector('button[type="submit"]:not([data-no-loading])');
+                if (!btn || btn.disabled) return;
+
+                var spinner = '<svg class="w-4 h-4 animate-spin inline-block mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>';
+                btn.innerHTML = spinner + 'Processing…';
+                btn.disabled = true;
+                btn.style.opacity = '0.75';
+                btn.style.cursor = 'not-allowed';
+            });
+        });
+    });
+    </script>
 </body>
 </html>

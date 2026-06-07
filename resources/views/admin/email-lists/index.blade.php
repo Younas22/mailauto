@@ -150,7 +150,7 @@
                 <td class="px-6 py-3.5 text-right">
                     <form method="POST" action="{{ route('admin.email-lists.destroy', $contact) }}"
                           onsubmit="return confirm('Remove this contact?')"
-                          class="inline opacity-0 group-hover:opacity-100 transition-opacity">
+                          class="inline opacity-60 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         @csrf @method('DELETE')
                         <button type="submit"
                                 class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition">
