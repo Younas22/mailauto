@@ -22,6 +22,10 @@ class EmailLogController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('provider') && in_array($request->provider, ['ses', 'resend'])) {
+            $query->where('provider', $request->provider);
+        }
+
         if ($request->filled('campaign_id')) {
             $query->where('campaign_id', $request->campaign_id);
         }
@@ -57,6 +61,9 @@ class EmailLogController extends Controller
         if ($request->filled('status') && in_array($request->status, ['sent', 'failed'])) {
             $query->where('status', $request->status);
         }
+        if ($request->filled('provider') && in_array($request->provider, ['ses', 'resend'])) {
+            $query->where('provider', $request->provider);
+        }
         if ($request->filled('campaign_id')) {
             $query->where('campaign_id', $request->campaign_id);
         }
@@ -71,7 +78,7 @@ class EmailLogController extends Controller
 
         return response()->streamDownload(function () use ($query) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Email', 'Campaign', 'Template', 'Status', 'Error', 'Sent At', 'Created At']);
+            fputcsv($handle, ['Email', 'Campaign', 'Template', 'Provider', 'Status', 'Error', 'Sent At', 'Created At']);
 
             $query->chunk(500, function ($rows) use ($handle) {
                 foreach ($rows as $log) {
@@ -79,6 +86,7 @@ class EmailLogController extends Controller
                         $log->email,
                         $log->campaign?->name ?? '',
                         $log->template?->title ?? '',
+                        $log->provider ?? '',
                         $log->status,
                         $log->error_message ?? '',
                         $log->sent_at?->format('Y-m-d H:i:s') ?? '',

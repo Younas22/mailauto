@@ -12,6 +12,7 @@ class CampaignLog extends Model
         'email_list_id',
         'email_template_id',
         'email',
+        'provider',
         'status',
         'error_message',
         'sent_at',

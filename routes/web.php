@@ -11,7 +11,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\UnsubscribeController;
 
 Route::get('/', function () {
-    return redirect()->route('login');
+    return redirect()->route(auth()->check() ? 'admin.dashboard' : 'login');
 });
 
 // ── Unsubscribe (public) ──────────────────────────────────────────────────────
@@ -49,9 +49,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/settings',                           [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/general',                  [SettingsController::class, 'updateGeneral'])->name('settings.general');
     Route::post('/settings/email',                    [SettingsController::class, 'updateEmail'])->name('settings.email');
+    Route::post('/settings/provider',                 [SettingsController::class, 'updateProvider'])->name('settings.provider');
+    Route::post('/settings/provider/test',            [SettingsController::class, 'testActiveProvider'])->name('settings.provider.test');
+    Route::post('/settings/provider/fallback',        [SettingsController::class, 'updateProviderFallback'])->name('settings.provider.fallback');
     Route::post('/settings/email/test',               [SettingsController::class, 'testEmail'])->name('settings.email.test');
     Route::post('/settings/ses',                      [SettingsController::class, 'updateSes'])->name('settings.ses');
     Route::post('/settings/ses/test',                 [SettingsController::class, 'testSes'])->name('settings.ses.test');
+    Route::post('/settings/resend',                   [SettingsController::class, 'updateResend'])->name('settings.resend');
+    Route::post('/settings/resend/test',              [SettingsController::class, 'testResend'])->name('settings.resend.test');
     Route::post('/settings/campaign',                 [SettingsController::class, 'updateCampaign'])->name('settings.campaign');
     Route::post('/settings/log',                      [SettingsController::class, 'updateLog'])->name('settings.log');
     Route::post('/settings/security',                 [SettingsController::class, 'updateSecurity'])->name('settings.security');

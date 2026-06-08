@@ -8,6 +8,7 @@ use App\Models\CampaignLog;
 use App\Models\EmailList;
 use App\Models\EmailTemplate;
 use App\Models\Setting;
+use App\Services\EmailProviders\EmailProviderManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,7 +16,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Throwable;
@@ -96,12 +96,21 @@ class SendCampaignEmailJob implements ShouldQueue
             $emailItem->setRawAttributes(array_merge($emailItem->getRawOriginal(), ['unsubscribe_token' => $token]));
         }
 
+        $provider = Setting::get('active_email_provider', 'ses');
+
         try {
-            Mail::to($emailItem->email, $emailItem->name ?? '')
-                ->send(new CampaignMail($template, $emailItem->name ?? '', $emailItem->getRawOriginal('unsubscribe_token') ?? ''));
+            $content = (new CampaignMail($template, $emailItem->name ?? '', $emailItem->getRawOriginal('unsubscribe_token') ?? ''))
+                ->renderContent();
+
+            $result = EmailProviderManager::send([
+                'to'      => $emailItem->email,
+                'to_name' => $emailItem->name ?? '',
+                'subject' => $content['subject'],
+                'html'    => $content['html'],
+            ]);
 
             $emailItem->update(['status' => 'sent']);
-            $this->logResult($campaign->id, $emailItem, $template->id, 'sent');
+            $this->logResult($campaign->id, $emailItem, $template->id, 'sent', null, $result['provider'] ?? $provider);
             $campaign->increment('sent_count');
         } catch (Throwable $e) {
             $retryEnabled = Setting::get('campaign_retry_failed', '1') === '1';
@@ -109,7 +118,7 @@ class SendCampaignEmailJob implements ShouldQueue
             if (!$retryEnabled) {
                 // No retry: permanently fail this email now
                 $emailItem->update(['status' => 'failed']);
-                $this->logResult($campaign->id, $emailItem, $template->id, 'failed', $e->getMessage());
+                $this->logResult($campaign->id, $emailItem, $template->id, 'failed', $e->getMessage(), $provider);
                 $campaign->increment('failed_count');
                 Log::error("Campaign [{$this->campaignId}] permanently failed for {$emailItem->email}: " . $e->getMessage());
                 $this->checkCompletion($campaign);
@@ -138,7 +147,7 @@ class SendCampaignEmailJob implements ShouldQueue
         if (in_array($emailItem->status, ['sent', 'failed'])) return;
 
         $emailItem->update(['status' => 'failed']);
-        $this->logResult($campaign->id, $emailItem, null, 'failed', $exception->getMessage());
+        $this->logResult($campaign->id, $emailItem, null, 'failed', $exception->getMessage(), Setting::get('active_email_provider', 'ses'));
         $campaign->increment('failed_count');
         $this->checkCompletion($campaign);
     }
@@ -161,13 +170,14 @@ class SendCampaignEmailJob implements ShouldQueue
         return true;
     }
 
-    private function logResult(int $campaignId, EmailList $emailItem, ?int $templateId, string $status, ?string $error = null): void
+    private function logResult(int $campaignId, EmailList $emailItem, ?int $templateId, string $status, ?string $error = null, ?string $provider = null): void
     {
         CampaignLog::create([
             'campaign_id'       => $campaignId,
             'email_list_id'     => $emailItem->id,
             'email_template_id' => $templateId,
             'email'             => $emailItem->email,
+            'provider'          => $provider,
             'status'            => $status,
             'error_message'     => $error,
             'sent_at'           => $status === 'sent' ? now() : null,

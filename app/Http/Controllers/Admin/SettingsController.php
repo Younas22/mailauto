@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\CampaignLog;
+use App\Services\EmailProviders\EmailProviderManager;
+use Aws\Ses\SesClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
+use Resend;
+use Throwable;
 
 class SettingsController extends Controller
 {
@@ -60,7 +64,7 @@ class SettingsController extends Controller
     public function updateEmail(Request $request): \Illuminate\Http\RedirectResponse
     {
         $data = $request->validate([
-            'mail_driver'     => 'required|in:smtp,ses,sendmail,log',
+            'mail_driver'     => 'required|in:smtp,ses,resend,sendmail,log',
             'smtp_host'       => 'nullable|string|max:255',
             'smtp_port'       => 'nullable|numeric|between:1,65535',
             'smtp_username'   => 'nullable|string|max:255',
@@ -95,6 +99,80 @@ class SettingsController extends Controller
         }
     }
 
+    // ── Active Email Provider (campaign sending engine) ──────────────────────
+
+    public function updateProvider(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'active_email_provider' => 'required|in:ses,resend',
+        ]);
+
+        Setting::set('active_email_provider', $data['active_email_provider']);
+
+        $label = $data['active_email_provider'] === 'ses' ? 'Amazon SES' : 'Resend';
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$label} is now the active campaign provider.",
+            'active'  => $data['active_email_provider'],
+        ]);
+    }
+
+    public function updateProviderFallback(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'email_fallback_enabled' => 'required|boolean',
+            'backup_email_provider'  => 'nullable|in:ses,resend',
+        ]);
+
+        $enabled = $request->boolean('email_fallback_enabled');
+        $primary = Setting::get('active_email_provider', 'ses');
+        $backup  = $data['backup_email_provider'] ?? null;
+
+        if ($enabled && (!$backup || $backup === $primary)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Choose a backup provider that is different from the active provider to enable fallback.',
+            ], 422);
+        }
+
+        Setting::setMany([
+            'email_fallback_enabled' => $enabled ? '1' : '0',
+            'backup_email_provider'  => $backup ?? '',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $enabled
+                ? 'Automatic fallback enabled — campaigns will retry through the backup provider if the active provider fails.'
+                : 'Automatic fallback disabled.',
+        ]);
+    }
+
+    public function testActiveProvider(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate(['test_to' => 'required|email']);
+
+        $active = Setting::get('active_email_provider', 'ses');
+        $label  = $active === 'ses' ? 'Amazon SES' : 'Resend';
+
+        try {
+            EmailProviderManager::send([
+                'to'      => $request->test_to,
+                'to_name' => '',
+                'subject' => 'MailAuto — Test Email (Active Provider)',
+                'html'    => "<p>This is a test email sent through your active campaign provider ({$label}). Your provider configuration is working correctly!</p>",
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Test email sent successfully via {$label} to {$request->test_to}.",
+            ]);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => "Send via {$label} failed: " . $e->getMessage()], 422);
+        }
+    }
+
     // ── Amazon SES Settings ───────────────────────────────────────────────────
 
     public function updateSes(Request $request): \Illuminate\Http\RedirectResponse
@@ -122,8 +200,61 @@ class SettingsController extends Controller
             return response()->json(['success' => false, 'message' => 'AWS credentials are not configured.'], 422);
         }
 
-        // Future: use AWS SDK to call SES GetSendQuota
-        return response()->json(['success' => true, 'message' => 'AWS credentials are present. Deploy the AWS SDK to verify the live connection.']);
+        try {
+            $client = new SesClient([
+                'version'     => 'latest',
+                'region'      => $region,
+                'credentials' => ['key' => $key, 'secret' => $secret],
+            ]);
+
+            $quota = $client->getSendQuota();
+
+            $max  = (float) $quota->get('Max24HourSend');
+            $sent = (float) $quota->get('SentLast24Hours');
+
+            return response()->json([
+                'success' => true,
+                'message' => "Connected to Amazon SES ({$region}). Sending quota: " . number_format($sent) . ' / ' . number_format($max) . ' used in the last 24 hours.',
+            ]);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'SES connection failed: ' . $e->getMessage()], 422);
+        }
+    }
+
+    // ── Resend Settings ───────────────────────────────────────────────────────
+
+    public function updateResend(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $data = $request->validate([
+            'resend_api_key'      => 'nullable|string|max:255',
+            'resend_sender_email' => 'nullable|email',
+            'resend_domain'       => 'nullable|string|max:255',
+        ]);
+
+        Setting::setMany($data);
+
+        return back()->with('success_resend', 'Resend settings saved successfully.');
+    }
+
+    public function testResend(): \Illuminate\Http\JsonResponse
+    {
+        $apiKey = Setting::get('resend_api_key');
+
+        if (!$apiKey) {
+            return response()->json(['success' => false, 'message' => 'Resend API key is not configured.'], 422);
+        }
+
+        try {
+            $domains = Resend::client($apiKey)->domains->list();
+            $count   = count($domains['data'] ?? []);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Connected to Resend. {$count} domain(s) registered on this account.",
+            ]);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Resend connection failed: ' . $e->getMessage()], 422);
+        }
     }
 
     // ── Campaign Settings ─────────────────────────────────────────────────────

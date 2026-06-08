@@ -219,7 +219,7 @@
         }
     });
 
-    document.querySelector('form').addEventListener('submit', function () {
+    document.getElementById('quill-editor').closest('form').addEventListener('submit', function () {
         document.getElementById('body-input').value = quill.root.innerHTML;
     });
 </script>

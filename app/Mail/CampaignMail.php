@@ -17,7 +17,11 @@ class CampaignMail extends Mailable
         public string $unsubscribeToken = ''
     ) {}
 
-    public function build(): static
+    /**
+     * Render the subject and HTML body, with placeholders replaced and the
+     * unsubscribe footer appended. Shared by build() and provider-based sending.
+     */
+    public function renderContent(): array
     {
         $body = $this->template->body;
 
@@ -34,8 +38,15 @@ class CampaignMail extends Mailable
             $body .= $unsubscribeHtml;
         }
 
+        return ['subject' => $this->template->subject, 'html' => $body];
+    }
+
+    public function build(): static
+    {
+        $content = $this->renderContent();
+
         return $this
-            ->subject($this->template->subject)
-            ->html($body);
+            ->subject($content['subject'])
+            ->html($content['html']);
     }
 }

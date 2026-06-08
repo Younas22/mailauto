@@ -7,7 +7,7 @@
 @section('content')
 
 {{-- ─── Alerts ───────────────────────────────────────────────────────── --}}
-@foreach(['general','email','ses','campaign','log','security'] as $sec)
+@foreach(['general','email','ses','resend','campaign','log','security'] as $sec)
     @if(session("success_{$sec}"))
     <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
          x-transition:leave="transition ease-in duration-300"
@@ -50,6 +50,7 @@
             { id: 'general',  label: 'General',       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
             { id: 'email',    label: 'Email / SMTP',  icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
             { id: 'ses',      label: 'Amazon SES',    icon: 'M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z' },
+            { id: 'resend',   label: 'Resend',        icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
             { id: 'campaign', label: 'Campaigns',     icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z' },
             { id: 'log',      label: 'Logs',          icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
             { id: 'security', label: 'Security',      icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
@@ -260,6 +261,134 @@
              x-transition:enter-start="opacity-0 translate-y-2"
              x-transition:enter-end="opacity-100 translate-y-0">
 
+            {{-- Active Campaign Provider — instant switcher + active-provider test --}}
+            <div x-data="providerSwitcher('{{ $settings['active_email_provider'] ?? 'ses' }}', {{ ($settings['email_fallback_enabled'] ?? '0') === '1' ? 'true' : 'false' }}, '{{ $settings['backup_email_provider'] ?? '' }}')" class="mb-5">
+                <div class="bg-white dark:bg-[#111827] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900 dark:text-white">Active Campaign Provider</h2>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Pick which provider sends your campaign emails — switches instantly, no .env changes or page reload needed</p>
+                        </div>
+                    </div>
+
+                    <div class="p-6 space-y-5">
+                        {{-- Provider buttons (only one active at a time) --}}
+                        <div class="flex flex-wrap gap-3">
+                            <button type="button" @click="setActive('ses')" :disabled="switching"
+                                    :class="active === 'ses'
+                                        ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 ring-2 ring-emerald-200 dark:ring-emerald-800/40'
+                                        : 'border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600'"
+                                    class="flex items-center gap-2.5 px-5 py-3 rounded-xl border transition disabled:opacity-60 disabled:cursor-wait">
+                                <span class="text-base leading-none">🟢</span>
+                                <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Amazon SES</span>
+                                <span x-show="active === 'ses'" x-cloak
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                                </span>
+                            </button>
+
+                            <button type="button" @click="setActive('resend')" :disabled="switching"
+                                    :class="active === 'resend'
+                                        ? 'border-violet-400 bg-violet-50 dark:bg-violet-900/20 ring-2 ring-violet-200 dark:ring-violet-800/40'
+                                        : 'border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600'"
+                                    class="flex items-center gap-2.5 px-5 py-3 rounded-xl border transition disabled:opacity-60 disabled:cursor-wait">
+                                <span class="text-base leading-none">🟣</span>
+                                <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Resend</span>
+                                <span x-show="active === 'resend'" x-cloak
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span> Active
+                                </span>
+                            </button>
+
+                            <span x-show="switching" x-cloak class="inline-flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+                                <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Switching…
+                            </span>
+                        </div>
+
+                        <div x-show="switchMessage" x-cloak x-transition
+                             :class="switchSuccess ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40' : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40'"
+                             class="text-xs font-medium px-3 py-2 rounded-lg border" x-text="switchMessage"></div>
+
+                        {{-- Send a test email through whichever provider is currently active --}}
+                        <div class="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-4 bg-slate-50/50 dark:bg-slate-800/20">
+                            <p class="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-3">
+                                Send Test Email via Active Provider
+                                <span class="font-normal text-slate-400 dark:text-slate-500">— uses <span x-text="active === 'ses' ? 'Amazon SES' : 'Resend'" class="font-semibold"></span> directly, bypassing the configured mail driver</span>
+                            </p>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="email" x-model="testEmail" placeholder="recipient@example.com"
+                                       class="flex-1 px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none">
+                                <button type="button" @click="sendTest()" :disabled="testLoading"
+                                        class="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-all duration-150 flex-shrink-0">
+                                    <svg x-show="testLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <svg x-show="!testLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                                    </svg>
+                                    <span x-text="testLoading ? 'Sending…' : 'Send Test'"></span>
+                                </button>
+                            </div>
+                            <div x-show="testResult" x-cloak x-transition
+                                 :class="testSuccess ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40' : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40'"
+                                 class="mt-3 text-xs font-medium px-3 py-2 rounded-lg border" x-text="testResult"></div>
+                        </div>
+
+                        {{-- Automatic fallback — retry through a backup provider when the primary send fails --}}
+                        <div class="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-4 bg-slate-50/50 dark:bg-slate-800/20">
+                            <div class="flex items-start justify-between gap-4 mb-3">
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-600 dark:text-slate-400">Automatic Provider Fallback</p>
+                                    <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">If the active provider fails to send, automatically retry the same email through a backup provider.</p>
+                                </div>
+                                <button type="button" role="switch" :aria-checked="fallbackEnabled.toString()" @click="fallbackEnabled = !fallbackEnabled"
+                                        :class="fallbackEnabled ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700'"
+                                        class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors">
+                                    <span :class="fallbackEnabled ? 'translate-x-6' : 'translate-x-1'"
+                                          class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"></span>
+                                </button>
+                            </div>
+
+                            <div x-show="fallbackEnabled" x-cloak x-transition class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                                <label class="text-xs font-medium text-slate-500 dark:text-slate-400 flex-shrink-0">Backup provider</label>
+                                <div class="relative flex-1 sm:flex-none sm:w-48">
+                                    <select x-model="backupProvider"
+                                            class="appearance-none w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none cursor-pointer">
+                                        <option value="">Select a provider…</option>
+                                        <option value="ses"    :disabled="active === 'ses'">Amazon SES</option>
+                                        <option value="resend" :disabled="active === 'resend'">Resend</option>
+                                    </select>
+                                </div>
+                                <button type="button" @click="saveFallback()" :disabled="fallbackSaving"
+                                        class="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-all duration-150 flex-shrink-0">
+                                    <span x-text="fallbackSaving ? 'Saving…' : 'Save'"></span>
+                                </button>
+                            </div>
+                            <div x-show="!fallbackEnabled" x-cloak class="flex justify-end">
+                                <button type="button" @click="saveFallback()" :disabled="fallbackSaving"
+                                        class="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition">
+                                    <span x-text="fallbackSaving ? 'Saving…' : 'Save'"></span>
+                                </button>
+                            </div>
+
+                            <div x-show="fallbackMessage" x-cloak x-transition
+                                 :class="fallbackSuccess ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40' : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40'"
+                                 class="mt-3 text-xs font-medium px-3 py-2 rounded-lg border" x-text="fallbackMessage"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <form method="POST" action="{{ route('admin.settings.email') }}">
                 @csrf
                 <input type="hidden" name="_section" value="email">
@@ -285,6 +414,7 @@
                                 @php $driver = old('mail_driver', $settings['mail_driver'] ?? 'smtp'); @endphp
                                 <option value="smtp"     {{ $driver==='smtp'     ? 'selected':'' }}>SMTP</option>
                                 <option value="ses"      {{ $driver==='ses'      ? 'selected':'' }}>Amazon SES</option>
+                                <option value="resend"   {{ $driver==='resend'   ? 'selected':'' }}>Resend</option>
                                 <option value="sendmail" {{ $driver==='sendmail' ? 'selected':'' }}>Sendmail</option>
                                 <option value="log"      {{ $driver==='log'      ? 'selected':'' }}>Log (Testing)</option>
                             </select>
@@ -489,7 +619,7 @@
                             <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            <p class="text-xs text-amber-700 dark:text-amber-400">Install the <span class="font-semibold">aws/aws-sdk-php</span> package and configure <code class="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">MAIL_MAILER=ses</code> in <code class="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">.env</code> to fully activate Amazon SES.</p>
+                            <p class="text-xs text-amber-700 dark:text-amber-400">Select <span class="font-semibold">Amazon SES</span> as the mail driver on the Email / SMTP tab to make this the active sending provider — no <code class="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">.env</code> changes needed.</p>
                         </div>
                     </div>
 
@@ -497,6 +627,94 @@
                         <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             Save SES Settings
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {{-- ══════════════════════════════════════════════════
+             RESEND SETTINGS
+        ══════════════════════════════════════════════════ --}}
+        <div x-show="activeTab === 'resend'"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0">
+
+            <form method="POST" action="{{ route('admin.settings.resend') }}">
+                @csrf
+                <input type="hidden" name="_section" value="resend">
+
+                <div class="bg-white dark:bg-[#111827] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <h2 class="text-sm font-bold text-slate-900 dark:text-white">Resend Settings</h2>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Resend transactional email API configuration</p>
+                        </div>
+                        {{-- Connection Status --}}
+                        <div x-data="resendStatus()" class="flex items-center gap-2">
+                            <span :class="connected ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'"
+                                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors">
+                                <span :class="connected ? 'bg-emerald-500' : 'bg-slate-400'" class="w-1.5 h-1.5 rounded-full transition-colors"></span>
+                                <span x-text="connected ? 'Connected' : 'Not Verified'"></span>
+                            </span>
+                            <button type="button" @click="verify()" :disabled="loading"
+                                    class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50 transition">
+                                <span x-text="loading ? 'Checking…' : 'Verify'"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-6 space-y-5">
+                        {{-- API Key --}}
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Resend API Key</label>
+                            <div class="relative" x-data="{ show: false }">
+                                <input :type="show ? 'text' : 'password'" name="resend_api_key"
+                                       value="{{ old('resend_api_key', $settings['resend_api_key'] ?? '') }}"
+                                       class="w-full px-3.5 py-2.5 pr-10 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm font-mono text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none"
+                                       placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxx">
+                                <button type="button" @click="show = !show" class="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition">
+                                    <svg x-show="!show" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    <svg x-show="show" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Verified Domain + Sender Email --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Verified Domain</label>
+                                <input type="text" name="resend_domain" value="{{ old('resend_domain', $settings['resend_domain'] ?? '') }}"
+                                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none"
+                                       placeholder="example.com">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Sender Email</label>
+                                <input type="email" name="resend_sender_email" value="{{ old('resend_sender_email', $settings['resend_sender_email'] ?? '') }}"
+                                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none"
+                                       placeholder="sender@example.com">
+                            </div>
+                        </div>
+
+                        {{-- Info banner --}}
+                        <div class="flex items-start gap-3 bg-violet-50 dark:bg-violet-900/15 border border-violet-200 dark:border-violet-800/40 rounded-xl px-4 py-3">
+                            <svg class="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="text-xs text-violet-700 dark:text-violet-400">Select <span class="font-semibold">Resend</span> as the mail driver on the Email / SMTP tab to make this the active sending provider — no <code class="bg-violet-100 dark:bg-violet-900/40 px-1 rounded font-mono">.env</code> changes needed.</p>
+                        </div>
+                    </div>
+
+                    <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Save Resend Settings
                         </button>
                     </div>
                 </div>
@@ -931,6 +1149,94 @@
 
 @push('scripts')
 <script>
+function providerSwitcher(initial, fallbackEnabled, backupProvider) {
+    return {
+        active: initial,
+        switching: false,
+        switchMessage: '',
+        switchSuccess: false,
+        testEmail: '',
+        testLoading: false,
+        testResult: '',
+        testSuccess: false,
+        fallbackEnabled: fallbackEnabled,
+        backupProvider: backupProvider,
+        fallbackSaving: false,
+        fallbackMessage: '',
+        fallbackSuccess: false,
+        async saveFallback() {
+            if (this.fallbackEnabled && !this.backupProvider) {
+                this.fallbackSuccess = false;
+                this.fallbackMessage = 'Choose a backup provider first.';
+                return;
+            }
+            this.fallbackSaving = true;
+            this.fallbackMessage = '';
+            try {
+                const fd = new FormData();
+                fd.append('email_fallback_enabled', this.fallbackEnabled ? '1' : '0');
+                fd.append('backup_email_provider', this.backupProvider || '');
+                fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}');
+                const res  = await fetch('{{ route('admin.settings.provider.fallback') }}', {
+                    method: 'POST', body: fd, headers: { 'Accept': 'application/json' }
+                });
+                const json = await res.json();
+                this.fallbackSuccess = json.success;
+                this.fallbackMessage = json.message;
+            } catch (e) {
+                this.fallbackSuccess = false;
+                this.fallbackMessage = 'Network error — check console.';
+            } finally {
+                this.fallbackSaving = false;
+            }
+        },
+        async setActive(provider) {
+            if (this.active === provider || this.switching) return;
+            this.switching     = true;
+            this.switchMessage = '';
+            try {
+                const fd = new FormData();
+                fd.append('active_email_provider', provider);
+                fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}');
+                const res  = await fetch('{{ route('admin.settings.provider') }}', {
+                    method: 'POST', body: fd, headers: { 'Accept': 'application/json' }
+                });
+                const json = await res.json();
+                this.switchSuccess = json.success;
+                this.switchMessage = json.message;
+                if (json.success) {
+                    this.active = provider;
+                    if (this.backupProvider === provider) this.backupProvider = '';
+                }
+            } catch (e) {
+                this.switchSuccess = false;
+                this.switchMessage = 'Network error — check console.';
+            } finally {
+                this.switching = false;
+            }
+        },
+        async sendTest() {
+            if (!this.testEmail) { this.testResult = 'Please enter a recipient email.'; this.testSuccess = false; return; }
+            this.testLoading = true;
+            this.testResult  = '';
+            try {
+                const fd = new FormData();
+                fd.append('test_to', this.testEmail);
+                fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}');
+                const res  = await fetch('{{ route('admin.settings.provider.test') }}', { method: 'POST', body: fd });
+                const json = await res.json();
+                this.testSuccess = json.success;
+                this.testResult  = json.message;
+            } catch (e) {
+                this.testSuccess = false;
+                this.testResult  = 'Network error — check console.';
+            } finally {
+                this.testLoading = false;
+            }
+        }
+    };
+}
+
 function testEmail() {
     return {
         email: '',
@@ -969,6 +1275,28 @@ function sesStatus() {
                 const fd = new FormData();
                 fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}');
                 const res  = await fetch('{{ route('admin.settings.ses.test') }}', { method: 'POST', body: fd });
+                const json = await res.json();
+                this.connected = json.success;
+                alert(json.message);
+            } catch (e) {
+                this.connected = false;
+            } finally {
+                this.loading = false;
+            }
+        }
+    };
+}
+
+function resendStatus() {
+    return {
+        connected: false,
+        loading: false,
+        async verify() {
+            this.loading = true;
+            try {
+                const fd = new FormData();
+                fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}');
+                const res  = await fetch('{{ route('admin.settings.resend.test') }}', { method: 'POST', body: fd });
                 const json = await res.json();
                 this.connected = json.success;
                 alert(json.message);

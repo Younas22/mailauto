@@ -16,6 +16,7 @@ class Setting extends Model
         'smtp_username',
         'ses_access_key',
         'ses_secret_key',
+        'resend_api_key',
     ];
 
     private static function encrypt(string $key, mixed $value): mixed
@@ -94,6 +95,7 @@ class Setting extends Model
             'services.ses.key'             => $s['ses_access_key']   ?? null,
             'services.ses.secret'          => $s['ses_secret_key']   ?? null,
             'services.ses.region'          => $s['ses_region']       ?? 'us-east-1',
+            'services.resend.key'          => $s['resend_api_key']   ?? null,
         ]);
 
         // Clear any cached mailer instances so the new config takes effect immediately

@@ -95,6 +95,21 @@
                 </svg>
             </div>
 
+            {{-- Provider filter --}}
+            <div class="relative flex-shrink-0">
+                <select name="provider"
+                        class="appearance-none w-full sm:w-40 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                               text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer
+                               focus:border-brand-400 transition">
+                    <option value="" {{ !request('provider') ? 'selected' : '' }}>All Providers</option>
+                    <option value="ses"    {{ request('provider') === 'ses'    ? 'selected' : '' }}>Amazon SES</option>
+                    <option value="resend" {{ request('provider') === 'resend' ? 'selected' : '' }}>Resend</option>
+                </select>
+                <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+
             {{-- Campaign filter --}}
             <div class="relative flex-shrink-0">
                 <select name="campaign_id"
@@ -138,7 +153,7 @@
                         class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-brand-200/30">
                     Filter
                 </button>
-                @if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
+                @if(request('search') || request('status') || request('provider') || request('campaign_id') || request('date_from') || request('date_to'))
                 <a href="{{ route('admin.email-logs.index') }}"
                    class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700
                           text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition border border-slate-200 dark:border-slate-700">
@@ -158,12 +173,13 @@
 </div>
 
 {{-- Results count --}}
-@if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
+@if(request('search') || request('status') || request('provider') || request('campaign_id') || request('date_from') || request('date_to'))
 <p class="text-xs text-slate-500 dark:text-slate-400 mb-3 px-1">
     Showing <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $logs->total() }}</span>
     result{{ $logs->total() !== 1 ? 's' : '' }}
     @if(request('search')) for <span class="font-semibold text-slate-700 dark:text-slate-300">"{{ request('search') }}"</span>@endif
     @if(request('status')) with status <span class="font-semibold text-slate-700 dark:text-slate-300">{{ request('status') }}</span>@endif
+    @if(request('provider')) via <span class="font-semibold text-slate-700 dark:text-slate-300">{{ request('provider') === 'ses' ? 'Amazon SES' : 'Resend' }}</span>@endif
     @if(request('campaign_id')) in campaign <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $campaigns->firstWhere('id', request('campaign_id'))?->name ?? '#'.request('campaign_id') }}</span>@endif
     @if(request('date_from') || request('date_to')) from <span class="font-semibold text-slate-700 dark:text-slate-300">{{ request('date_from', '…') }}</span> to <span class="font-semibold text-slate-700 dark:text-slate-300">{{ request('date_to', 'today') }}</span>@endif
 </p>
@@ -183,13 +199,13 @@
         </div>
         <p class="text-base font-bold text-slate-700 dark:text-slate-300 mb-1">No email logs found</p>
         <p class="text-sm text-slate-400 dark:text-slate-500 max-w-xs">
-            @if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
+            @if(request('search') || request('status') || request('provider') || request('campaign_id') || request('date_from') || request('date_to'))
                 No logs match your current filters. Try adjusting your search.
             @else
                 Email logs will appear here once campaigns start sending.
             @endif
         </p>
-        @if(request('search') || request('status') || request('campaign_id') || request('date_from') || request('date_to'))
+        @if(request('search') || request('status') || request('provider') || request('campaign_id') || request('date_from') || request('date_to'))
         <a href="{{ route('admin.email-logs.index') }}"
            class="mt-4 text-sm font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition">
             Clear filters
@@ -207,6 +223,7 @@
                     <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
                     <th class="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Template</th>
                     <th class="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Campaign</th>
+                    <th class="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Provider</th>
                     <th class="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                     <th class="text-left px-4 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Error</th>
                     <th class="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
@@ -251,6 +268,17 @@
                                class="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium text-sm transition">
                                 {{ Str::limit($log->campaign->name, 22) }}
                             </a>
+                        @else
+                            <span class="text-slate-300 dark:text-slate-600 text-sm">—</span>
+                        @endif
+                    </td>
+
+                    {{-- Provider --}}
+                    <td class="px-4 py-4">
+                        @if($log->provider)
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                {{ $log->provider === 'ses' ? 'Amazon SES' : ($log->provider === 'resend' ? 'Resend' : ucfirst($log->provider)) }}
+                            </span>
                         @else
                             <span class="text-slate-300 dark:text-slate-600 text-sm">—</span>
                         @endif
@@ -333,6 +361,14 @@
                        class="truncate text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium transition">
                         {{ Str::limit($log->campaign->name, 22) }}
                     </a>
+                </div>
+                @endif
+                @if($log->provider)
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span class="truncate">{{ $log->provider === 'ses' ? 'Amazon SES' : ($log->provider === 'resend' ? 'Resend' : ucfirst($log->provider)) }}</span>
                 </div>
                 @endif
             </div>
