@@ -78,6 +78,33 @@
     @endforeach
 </div>
 
+{{-- Bulk-select Alpine component --}}
+<div x-data="{
+    selected: [],
+    pageIds: {{ $emails->pluck('id')->toJson() }},
+    get allSelected() { return this.pageIds.length > 0 && this.selected.length === this.pageIds.length; },
+    get someSelected() { return this.selected.length > 0 && this.selected.length < this.pageIds.length; },
+    toggleAll(e) { this.selected = e.target.checked ? [...this.pageIds] : []; },
+    isSelected(id) { return this.selected.includes(id); },
+    toggle(id) {
+        const i = this.selected.indexOf(id);
+        i === -1 ? this.selected.push(id) : this.selected.splice(i, 1);
+    },
+    confirmBulkDelete() {
+        if (confirm('Remove ' + this.selected.length + ' selected contact(s)? This cannot be undone.')) {
+            document.getElementById('bulk-delete-form').submit();
+        }
+    }
+}">
+
+{{-- Hidden bulk-delete form --}}
+<form id="bulk-delete-form" method="POST" action="{{ route('admin.email-lists.bulk-destroy') }}">
+    @csrf @method('DELETE')
+    <template x-for="id in selected" :key="id">
+        <input type="hidden" name="ids[]" :value="id">
+    </template>
+</form>
+
 {{-- Header bar --}}
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
     {{-- Status filter tabs --}}
@@ -93,13 +120,30 @@
         @endforeach
     </div>
 
-    <a href="{{ route('admin.email-lists.import') }}"
-       class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-brand-300/30 hover:-translate-y-0.5">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-        </svg>
-        Import CSV
-    </a>
+    <div class="flex items-center gap-2">
+        {{-- Bulk delete button --}}
+        <button type="button"
+                x-show="selected.length > 0"
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                @click="confirmBulkDelete()"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            Delete Selected (<span x-text="selected.length"></span>)
+        </button>
+
+        <a href="{{ route('admin.email-lists.import') }}"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-brand-300/30 hover:-translate-y-0.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            Import CSV
+        </a>
+    </div>
 </div>
 
 {{-- Desktop table --}}
@@ -107,19 +151,33 @@
     <table class="w-full text-sm">
         <thead>
             <tr class="bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
-                <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">#</th>
-                <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
-                <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Added</th>
-                <th class="text-right px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
+                <th class="px-4 py-3.5 w-10">
+                    <input type="checkbox"
+                           :checked="allSelected"
+                           :indeterminate="someSelected"
+                           @change="toggleAll($event)"
+                           class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                </th>
+                <th class="text-left px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">#</th>
+                <th class="text-left px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+                <th class="text-left px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                <th class="text-left px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                <th class="text-left px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Added</th>
+                <th class="text-right px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-50 dark:divide-slate-800/60">
             @forelse($emails as $contact)
-            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group">
-                <td class="px-6 py-3.5 text-slate-400 dark:text-slate-500 text-xs font-medium">{{ $contact->id }}</td>
-                <td class="px-6 py-3.5">
+            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group"
+                :class="isSelected({{ $contact->id }}) ? 'bg-brand-50/40 dark:bg-brand-900/10' : ''">
+                <td class="px-4 py-3.5">
+                    <input type="checkbox"
+                           :checked="isSelected({{ $contact->id }})"
+                           @change="toggle({{ $contact->id }})"
+                           class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                </td>
+                <td class="px-4 py-3.5 text-slate-400 dark:text-slate-500 text-xs font-medium">{{ $contact->id }}</td>
+                <td class="px-4 py-3.5">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
                             @if($contact->status === 'sent') bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400
@@ -130,8 +188,8 @@
                         <span class="font-medium text-slate-700 dark:text-slate-300">{{ $contact->email }}</span>
                     </div>
                 </td>
-                <td class="px-6 py-3.5 text-slate-500 dark:text-slate-400">{{ $contact->name ?: '—' }}</td>
-                <td class="px-6 py-3.5">
+                <td class="px-4 py-3.5 text-slate-500 dark:text-slate-400">{{ $contact->name ?: '—' }}</td>
+                <td class="px-4 py-3.5">
                     @if($contact->status === 'pending')
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Pending
@@ -146,8 +204,8 @@
                         </span>
                     @endif
                 </td>
-                <td class="px-6 py-3.5 text-slate-400 dark:text-slate-500 text-xs">{{ $contact->created_at->format('M d, Y') }}</td>
-                <td class="px-6 py-3.5 text-right">
+                <td class="px-4 py-3.5 text-slate-400 dark:text-slate-500 text-xs">{{ $contact->created_at->format('M d, Y') }}</td>
+                <td class="px-4 py-3.5 text-right">
                     <form method="POST" action="{{ route('admin.email-lists.destroy', $contact) }}"
                           onsubmit="return confirm('Remove this contact?')"
                           class="inline opacity-60 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -165,7 +223,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="6" class="px-6 py-16 text-center">
+                <td colspan="7" class="px-6 py-16 text-center">
                     <div class="flex flex-col items-center gap-3">
                         <div class="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                             <svg class="w-7 h-7 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -219,9 +277,14 @@
 {{-- Mobile cards --}}
 <div class="md:hidden space-y-2">
     @forelse($emails as $contact)
-    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm px-4 py-3.5">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm px-4 py-3.5"
+         :class="isSelected({{ $contact->id }}) ? 'border-brand-300 dark:border-brand-700 bg-brand-50/30 dark:bg-brand-900/10' : ''">
         <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
+                <input type="checkbox"
+                       :checked="isSelected({{ $contact->id }})"
+                       @change="toggle({{ $contact->id }})"
+                       class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-brand-600 focus:ring-brand-500 flex-shrink-0 cursor-pointer">
                 <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
                     @if($contact->status === 'sent') bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400
                     @elseif($contact->status === 'failed') bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400
@@ -263,6 +326,29 @@
         </a>
     </div>
     @endforelse
+
+    {{-- Mobile bulk action bar --}}
+    <div x-show="selected.length > 0"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
+        <div class="flex items-center gap-3 bg-slate-900 dark:bg-slate-700 text-white px-5 py-3 rounded-2xl shadow-xl">
+            <span class="text-sm font-medium" x-text="selected.length + ' selected'"></span>
+            <button type="button" @click="confirmBulkDelete()"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Delete
+            </button>
+            <button type="button" @click="selected = []"
+                    class="text-slate-400 hover:text-white text-xs transition">Cancel</button>
+        </div>
+    </div>
 </div>
+
+</div>{{-- end x-data --}}
 
 @endsection

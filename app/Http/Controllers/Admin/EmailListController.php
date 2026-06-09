@@ -168,6 +168,13 @@ class EmailListController extends Controller
             ->with('import_result', compact('imported', 'duplicates', 'invalid'));
     }
 
+    public function bulkDelete(Request $request)
+    {
+        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer']);
+        $count = EmailList::whereIn('id', $request->ids)->delete();
+        return back()->with('success', "{$count} contact(s) removed.");
+    }
+
     public function destroy(EmailList $emailList)
     {
         $emailList->delete();
