@@ -621,6 +621,60 @@
                             </svg>
                             <p class="text-xs text-amber-700 dark:text-amber-400">Select <span class="font-semibold">Amazon SES</span> as the mail driver on the Email / SMTP tab to make this the active sending provider — no <code class="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">.env</code> changes needed.</p>
                         </div>
+
+                        {{-- Bounce & Complaint Webhook ─────────────────────────────────── --}}
+                        <div class="border-t border-slate-100 dark:border-slate-800 pt-5 space-y-4">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <p class="text-xs font-bold text-slate-700 dark:text-slate-300">Bounce &amp; Complaint Webhook (SNS)</p>
+                            </div>
+
+                            {{-- Webhook URL (read-only) --}}
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Webhook Endpoint URL</label>
+                                <div class="flex items-center gap-2" x-data="{ copied: false }">
+                                    <input type="text" readonly
+                                           value="{{ url('/webhooks/ses') }}"
+                                           class="flex-1 px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm font-mono text-slate-600 dark:text-slate-400 outline-none select-all cursor-text">
+                                    <button type="button"
+                                            @click="navigator.clipboard.writeText('{{ url('/webhooks/ses') }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                            class="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 transition">
+                                        <svg x-show="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <svg x-show="copied" x-cloak class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        <span x-text="copied ? 'Copied!' : 'Copy'"></span>
+                                    </button>
+                                </div>
+                                <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Paste this URL into your AWS SNS topic HTTPS subscription. The endpoint auto-confirms the subscription on first hit.</p>
+                            </div>
+
+                            {{-- Optional SNS Topic ARN --}}
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">SNS Topic ARN <span class="font-normal text-slate-400">(optional — for extra validation)</span></label>
+                                <input type="text" name="ses_webhook_topic_arn"
+                                       value="{{ old('ses_webhook_topic_arn', $settings['ses_webhook_topic_arn'] ?? '') }}"
+                                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm font-mono text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none"
+                                       placeholder="arn:aws:sns:us-east-1:123456789012:ses-notifications">
+                                <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">When set, incoming SNS notifications are rejected if they originate from a different topic.</p>
+                            </div>
+
+                            {{-- Setup guide --}}
+                            <div class="rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 px-4 py-3 space-y-1.5">
+                                <p class="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Setup Steps (AWS Console)</p>
+                                @foreach([
+                                    'SES → Configuration → Configuration Sets → create/select a set',
+                                    'Add an SNS destination for <strong>Bounces</strong> and <strong>Complaints</strong>',
+                                    'Create an SNS topic → Subscriptions → Protocol: HTTPS → paste the URL above',
+                                    'The subscription confirms automatically when the first request hits the endpoint',
+                                ] as $i => $step)
+                                <div class="flex items-start gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                    <span class="flex-shrink-0 w-4 h-4 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-[10px] font-bold flex items-center justify-center mt-0.5">{{ $i + 1 }}</span>
+                                    <span>{!! $step !!}</span>
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
 
                     <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex justify-end">
@@ -708,6 +762,70 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                             <p class="text-xs text-violet-700 dark:text-violet-400">Select <span class="font-semibold">Resend</span> as the mail driver on the Email / SMTP tab to make this the active sending provider — no <code class="bg-violet-100 dark:bg-violet-900/40 px-1 rounded font-mono">.env</code> changes needed.</p>
+                        </div>
+
+                        {{-- Bounce & Complaint Webhook ─────────────────────────────────── --}}
+                        <div class="border-t border-slate-100 dark:border-slate-800 pt-5 space-y-4">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <p class="text-xs font-bold text-slate-700 dark:text-slate-300">Bounce &amp; Complaint Webhook</p>
+                            </div>
+
+                            {{-- Webhook URL (read-only) --}}
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Webhook Endpoint URL</label>
+                                <div class="flex items-center gap-2" x-data="{ copied: false }">
+                                    <input type="text" readonly
+                                           value="{{ url('/webhooks/resend') }}"
+                                           class="flex-1 px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm font-mono text-slate-600 dark:text-slate-400 outline-none select-all cursor-text">
+                                    <button type="button"
+                                            @click="navigator.clipboard.writeText('{{ url('/webhooks/resend') }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                            class="flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 transition">
+                                        <svg x-show="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <svg x-show="copied" x-cloak class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        <span x-text="copied ? 'Copied!' : 'Copy'"></span>
+                                    </button>
+                                </div>
+                                <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Paste this URL in the Resend dashboard under Webhooks. Enable <strong>email.bounced</strong> and <strong>email.complained</strong> events.</p>
+                            </div>
+
+                            {{-- Webhook Signing Secret --}}
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                    Webhook Signing Secret
+                                    <span class="font-normal text-slate-400">— from Resend dashboard → Webhooks → Signing Secret</span>
+                                </label>
+                                <div class="relative" x-data="{ show: false }">
+                                    <input :type="show ? 'text' : 'password'" name="resend_webhook_secret"
+                                           value="{{ old('resend_webhook_secret', $settings['resend_webhook_secret'] ?? '') }}"
+                                           class="w-full px-3.5 py-2.5 pr-10 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm font-mono text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none"
+                                           placeholder="whsec_xxxxxxxxxxxxxxxxxxxxxxxx">
+                                    <button type="button" @click="show = !show" class="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition">
+                                        <svg x-show="!show" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        <svg x-show="show" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                    </button>
+                                </div>
+                                <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Required to verify webhook signatures and reject spoofed requests. Without this, all incoming Resend webhooks are accepted without verification.</p>
+                            </div>
+
+                            {{-- Setup guide --}}
+                            <div class="rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 px-4 py-3 space-y-1.5">
+                                <p class="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Setup Steps (Resend Dashboard)</p>
+                                @foreach([
+                                    'Resend Dashboard → Webhooks → Add Endpoint',
+                                    'Paste the Webhook Endpoint URL above',
+                                    'Enable events: <strong>email.bounced</strong>, <strong>email.complained</strong>, <strong>email.sent</strong>',
+                                    'Copy the <strong>Signing Secret</strong> (starts with <code class="font-mono">whsec_</code>) and paste it above',
+                                    'Save settings — webhooks will be verified automatically',
+                                ] as $i => $step)
+                                <div class="flex items-start gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                    <span class="flex-shrink-0 w-4 h-4 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center mt-0.5">{{ $i + 1 }}</span>
+                                    <span>{!! $step !!}</span>
+                                </div>
+                                @endforeach
+                            </div>
                         </div>
                     </div>
 

@@ -56,6 +56,14 @@ class SendCampaignEmailJob implements ShouldQueue
 
         if (!$campaign || !$emailItem) return;
 
+        // Never send to addresses suppressed by hard bounce or spam complaint.
+        if ($emailItem->isDoNotMail()) {
+            $this->logResult($campaign->id, $emailItem, null, 'failed', 'Address suppressed (bounce/complaint)');
+            $campaign->increment('failed_count');
+            $this->checkCompletion($campaign);
+            return;
+        }
+
         if ($campaign->status === 'paused') {
             $this->release(300); // Re-check every 5 min; doesn't count as an exception
             return;
@@ -110,7 +118,7 @@ class SendCampaignEmailJob implements ShouldQueue
             ]);
 
             $emailItem->update(['status' => 'sent']);
-            $this->logResult($campaign->id, $emailItem, $template->id, 'sent', null, $result['provider'] ?? $provider);
+            $this->logResult($campaign->id, $emailItem, $template->id, 'sent', null, $result['provider'] ?? $provider, $result['message_id'] ?? null);
             $campaign->increment('sent_count');
         } catch (Throwable $e) {
             $retryEnabled = Setting::get('campaign_retry_failed', '1') === '1';
@@ -170,17 +178,18 @@ class SendCampaignEmailJob implements ShouldQueue
         return true;
     }
 
-    private function logResult(int $campaignId, EmailList $emailItem, ?int $templateId, string $status, ?string $error = null, ?string $provider = null): void
+    private function logResult(int $campaignId, EmailList $emailItem, ?int $templateId, string $status, ?string $error = null, ?string $provider = null, ?string $messageId = null): void
     {
         CampaignLog::create([
-            'campaign_id'       => $campaignId,
-            'email_list_id'     => $emailItem->id,
-            'email_template_id' => $templateId,
-            'email'             => $emailItem->email,
-            'provider'          => $provider,
-            'status'            => $status,
-            'error_message'     => $error,
-            'sent_at'           => $status === 'sent' ? now() : null,
+            'campaign_id'         => $campaignId,
+            'email_list_id'       => $emailItem->id,
+            'email_template_id'   => $templateId,
+            'email'               => $emailItem->email,
+            'provider'            => $provider,
+            'provider_message_id' => $messageId,
+            'status'              => $status,
+            'error_message'       => $error,
+            'sent_at'             => $status === 'sent' ? now() : null,
         ]);
     }
 

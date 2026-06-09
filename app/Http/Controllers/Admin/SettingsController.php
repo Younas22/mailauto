@@ -178,11 +178,12 @@ class SettingsController extends Controller
     public function updateSes(Request $request): \Illuminate\Http\RedirectResponse
     {
         $data = $request->validate([
-            'ses_access_key'      => 'nullable|string|max:255',
-            'ses_secret_key'      => 'nullable|string|max:255',
-            'ses_region'          => 'nullable|string|max:50',
-            'ses_verified_domain' => 'nullable|string|max:255',
-            'ses_sender_email'    => 'nullable|email',
+            'ses_access_key'        => 'nullable|string|max:255',
+            'ses_secret_key'        => 'nullable|string|max:255',
+            'ses_region'            => 'nullable|string|max:50',
+            'ses_verified_domain'   => 'nullable|string|max:255',
+            'ses_sender_email'      => 'nullable|email',
+            'ses_webhook_topic_arn' => 'nullable|string|max:255',
         ]);
 
         Setting::setMany($data);
@@ -226,9 +227,10 @@ class SettingsController extends Controller
     public function updateResend(Request $request): \Illuminate\Http\RedirectResponse
     {
         $data = $request->validate([
-            'resend_api_key'      => 'nullable|string|max:255',
-            'resend_sender_email' => 'nullable|email',
-            'resend_domain'       => 'nullable|string|max:255',
+            'resend_api_key'        => 'nullable|string|max:255',
+            'resend_sender_email'   => 'nullable|email',
+            'resend_domain'         => 'nullable|string|max:255',
+            'resend_webhook_secret' => 'nullable|string|max:255',
         ]);
 
         Setting::setMany($data);

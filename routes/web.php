@@ -8,11 +8,19 @@ use App\Http\Controllers\Admin\CampaignController;
 use App\Http\Controllers\Admin\EmailLogController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\DeliverabilityController;
+use App\Http\Controllers\Admin\WarmupController;
 use App\Http\Controllers\UnsubscribeController;
+use App\Http\Controllers\Webhook\SesWebhookController;
+use App\Http\Controllers\Webhook\ResendWebhookController;
 
 Route::get('/', function () {
     return redirect()->route(auth()->check() ? 'admin.dashboard' : 'login');
 });
+
+// ── Webhooks (public, no CSRF) ────────────────────────────────────────────────
+Route::post('/webhooks/ses',    [SesWebhookController::class,    'handle'])->name('webhooks.ses');
+Route::post('/webhooks/resend', [ResendWebhookController::class, 'handle'])->name('webhooks.resend');
 
 // ── Unsubscribe (public) ──────────────────────────────────────────────────────
 Route::get('/unsubscribe/{token}',  [UnsubscribeController::class, 'show'])->name('unsubscribe.show');
@@ -61,6 +69,22 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::post('/settings/log',                      [SettingsController::class, 'updateLog'])->name('settings.log');
     Route::post('/settings/security',                 [SettingsController::class, 'updateSecurity'])->name('settings.security');
     Route::post('/settings/security/logout-devices',  [SettingsController::class, 'logoutDevices'])->name('settings.logout-devices');
+
+    // Deliverability — DNS
+    Route::get('/deliverability/dns-check',    [DeliverabilityController::class, 'dnsCheck'])->name('deliverability.dns-check');
+    Route::post('/deliverability/dns-recheck', [DeliverabilityController::class, 'dnsCheckRecheck'])->name('deliverability.dns-recheck');
+
+    // Deliverability — Warmup Planner
+    Route::get('/deliverability/warmup',                  [WarmupController::class, 'index'])->name('warmup.index');
+    Route::get('/deliverability/warmup/create',           [WarmupController::class, 'create'])->name('warmup.create');
+    Route::post('/deliverability/warmup',                 [WarmupController::class, 'store'])->name('warmup.store');
+    Route::get('/deliverability/warmup/{warmup}',         [WarmupController::class, 'show'])->name('warmup.show');
+    Route::post('/deliverability/warmup/{warmup}/activate', [WarmupController::class, 'activate'])->name('warmup.activate');
+    Route::post('/deliverability/warmup/{warmup}/pause',    [WarmupController::class, 'pause'])->name('warmup.pause');
+    Route::post('/deliverability/warmup/{warmup}/resume',   [WarmupController::class, 'resume'])->name('warmup.resume');
+    Route::post('/deliverability/warmup/{warmup}/stop',     [WarmupController::class, 'stop'])->name('warmup.stop');
+    Route::post('/deliverability/warmup/{warmup}/run-now',  [WarmupController::class, 'runNow'])->name('warmup.run-now');
+    Route::delete('/deliverability/warmup/{warmup}',        [WarmupController::class, 'destroy'])->name('warmup.destroy');
 
     // Campaigns
     Route::get('/campaigns',                          [CampaignController::class, 'index'])->name('campaigns.index');

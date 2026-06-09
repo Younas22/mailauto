@@ -306,6 +306,60 @@
                 <div class="h-px bg-slate-100 dark:bg-slate-800 mx-2"></div>
             </div>
 
+            {{-- Warmup Planner --}}
+            <div class="relative nav-item">
+                <a href="{{ route('admin.warmup.index') }}"
+                   :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'"
+                   class="sidebar-link flex items-center py-2.5 rounded-xl text-sm font-medium mb-0.5
+                          {{ request()->is('*admin/deliverability/warmup*')
+                             ? 'bg-brand-50 dark:bg-brand-900/25 text-brand-700 dark:text-brand-400'
+                             : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200' }}">
+                    <span class="w-[34px] h-[34px] rounded-lg flex items-center justify-center flex-shrink-0
+                                 {{ request()->is('*admin/deliverability/warmup*') ? 'bg-brand-100 dark:bg-brand-900/40' : 'bg-slate-100 dark:bg-slate-800' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </span>
+                    <span x-show="!sidebarCollapsed"
+                          x-transition:enter="transition-opacity duration-150"
+                          x-transition:enter-start="opacity-0"
+                          x-transition:enter-end="opacity-100"
+                          class="whitespace-nowrap">Warmup</span>
+                    @if(request()->is('*admin/deliverability/warmup*'))
+                    <span x-show="!sidebarCollapsed" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0"></span>
+                    @endif
+                </a>
+                <span x-show="sidebarCollapsed" class="nav-tooltip">Warmup</span>
+            </div>
+
+            {{-- DNS Health --}}
+            <div class="relative nav-item">
+                <a href="{{ route('admin.deliverability.dns-check') }}"
+                   :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'"
+                   class="sidebar-link flex items-center py-2.5 rounded-xl text-sm font-medium mb-0.5
+                          {{ request()->is('*admin/deliverability*')
+                             ? 'bg-brand-50 dark:bg-brand-900/25 text-brand-700 dark:text-brand-400'
+                             : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200' }}">
+                    <span class="w-[34px] h-[34px] rounded-lg flex items-center justify-center flex-shrink-0
+                                 {{ request()->is('*admin/deliverability*') ? 'bg-brand-100 dark:bg-brand-900/40' : 'bg-slate-100 dark:bg-slate-800' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+                        </svg>
+                    </span>
+                    <span x-show="!sidebarCollapsed"
+                          x-transition:enter="transition-opacity duration-150"
+                          x-transition:enter-start="opacity-0"
+                          x-transition:enter-end="opacity-100"
+                          class="whitespace-nowrap">DNS Health</span>
+                    @if(request()->is('*admin/deliverability*'))
+                    <span x-show="!sidebarCollapsed" class="ml-auto w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0"></span>
+                    @endif
+                </a>
+                <span x-show="sidebarCollapsed" class="nav-tooltip">DNS Health</span>
+            </div>
+
             <div class="relative nav-item">
                 <a href="{{ route('admin.settings.index') }}"
                    :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'"

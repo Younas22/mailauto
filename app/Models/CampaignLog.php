@@ -13,13 +13,18 @@ class CampaignLog extends Model
         'email_template_id',
         'email',
         'provider',
+        'provider_message_id',
         'status',
+        'bounce_type',
+        'complaint_reason',
         'error_message',
+        'event_at',
         'sent_at',
     ];
 
     protected $casts = [
-        'sent_at' => 'datetime',
+        'sent_at'  => 'datetime',
+        'event_at' => 'datetime',
     ];
 
     public function campaign(): BelongsTo
