@@ -34,6 +34,7 @@ class SettingsController extends Controller
             'admin_email'  => 'required|email',
             'timezone'     => 'required|string',
             'date_format'  => 'required|string',
+            'app_url'      => 'nullable|url|max:255',
             'logo'         => 'nullable|image|mimes:jpg,jpeg,png,svg,webp|max:2048',
             'favicon'      => 'nullable|image|mimes:jpg,jpeg,png,ico,svg|max:512',
         ]);
@@ -57,6 +58,30 @@ class SettingsController extends Controller
         Setting::setMany($data);
 
         return back()->with('success_general', 'General settings saved successfully.');
+    }
+
+    // ── Queue Worker ──────────────────────────────────────────────────────────
+
+    public function runQueueWorker(): \Illuminate\Http\JsonResponse
+    {
+        try {
+            $php     = PHP_BINARY;
+            $artisan = base_path('artisan');
+
+            if (PHP_OS_FAMILY === 'Windows') {
+                pclose(popen("start /B \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3", 'r'));
+            } else {
+                exec("nohup \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3 --timeout=60 > /dev/null 2>&1 &");
+            }
+
+            $pending = \Illuminate\Support\Facades\DB::table('jobs')->count();
+            return response()->json([
+                'success' => true,
+                'message' => "Queue worker started. {$pending} job(s) pending.",
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Failed: ' . $e->getMessage()]);
+        }
     }
 
     // ── Email / SMTP Settings ─────────────────────────────────────────────────

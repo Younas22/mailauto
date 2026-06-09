@@ -147,7 +147,27 @@
                             </div>
                         </div>
 
-                        {{-- Row 2: Admin Email --}}
+                        {{-- Row 2: App URL --}}
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                App URL
+                                <span class="font-normal text-slate-400">— used in email links (e.g. unsubscribe)</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-3.5 flex items-center pointer-events-none">
+                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                    </svg>
+                                </div>
+                                <input type="url" name="app_url" value="{{ old('app_url', $settings['app_url'] ?? '') }}"
+                                       class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 dark:focus:border-brand-500 transition outline-none"
+                                       placeholder="https://emailsystem.customernearme.com">
+                            </div>
+                            <p class="mt-1 text-[11px] text-slate-400 dark:text-slate-500">Leave empty to use the default <code class="font-mono">APP_URL</code> from .env</p>
+                            @error('app_url')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
+                        </div>
+
+                        {{-- Row 3: Admin Email --}}
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Admin Email <span class="text-red-400">*</span></label>
                             <div class="relative">
@@ -1224,6 +1244,42 @@
                         </div>
                     </div>
                     @endforeach
+                </div>
+
+                {{-- Queue Worker --}}
+                <div class="mx-6 mb-4 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden"
+                     x-data="{ loading: false, result: '', success: false }">
+                    <div class="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Queue Worker</p>
+                        <button type="button" :disabled="loading"
+                                @click="async () => {
+                                    loading = true; result = '';
+                                    try {
+                                        const fd = new FormData();
+                                        fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}');
+                                        const res  = await fetch('{{ route('admin.settings.queue-worker') }}', { method: 'POST', body: fd });
+                                        const json = await res.json();
+                                        success = json.success; result = json.message;
+                                    } catch(e) { success = false; result = 'Network error.'; }
+                                    finally { loading = false; }
+                                }"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg transition">
+                            <svg x-show="loading" class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <svg x-show="!loading" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span x-text="loading ? 'Starting…' : 'Run Queue Worker'"></span>
+                        </button>
+                    </div>
+                    <div class="px-4 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                        Processes all pending jobs and stops. Run this if a campaign is stuck or not sending.
+                    </div>
+                    <div x-show="result" x-cloak x-transition
+                         :class="success ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40' : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40'"
+                         class="mx-4 mb-3 text-xs font-medium px-3 py-2 rounded-lg border" x-text="result"></div>
                 </div>
 
                 {{-- Storage info --}}

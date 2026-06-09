@@ -70,6 +70,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::post('/settings/log',                      [SettingsController::class, 'updateLog'])->name('settings.log');
     Route::post('/settings/security',                 [SettingsController::class, 'updateSecurity'])->name('settings.security');
     Route::post('/settings/security/logout-devices',  [SettingsController::class, 'logoutDevices'])->name('settings.logout-devices');
+    Route::post('/settings/queue-worker',             [SettingsController::class, 'runQueueWorker'])->name('settings.queue-worker');
 
     // Deliverability — DNS
     Route::get('/deliverability/dns-check',    [DeliverabilityController::class, 'dnsCheck'])->name('deliverability.dns-check');
