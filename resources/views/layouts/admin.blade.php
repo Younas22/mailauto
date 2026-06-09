@@ -214,7 +214,7 @@
 
             {{-- Dashboard --}}
             <div class="relative nav-item">
-                <a href="/mailauto/admin/dashboard"
+                <a href="{{ route('admin.dashboard') }}"
                    :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'"
                    class="sidebar-link flex items-center py-2.5 rounded-xl text-sm font-medium mb-0.5
                           {{ request()->is('*admin/dashboard')
