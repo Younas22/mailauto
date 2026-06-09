@@ -13,7 +13,8 @@ class CampaignMail extends Mailable
 
     public function __construct(
         public EmailTemplate $template,
-        public string $recipientName = '',
+        public string $recipientName  = '',
+        public string $recipientEmail = '',
         public string $unsubscribeToken = ''
     ) {}
 
@@ -27,6 +28,10 @@ class CampaignMail extends Mailable
 
         if ($this->recipientName) {
             $body = str_replace(['{{name}}', '{{ name }}'], $this->recipientName, $body);
+        }
+
+        if ($this->recipientEmail) {
+            $body = str_replace(['{{email}}', '{{ email }}'], $this->recipientEmail, $body);
         }
 
         if ($this->unsubscribeToken) {

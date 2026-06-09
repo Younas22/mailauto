@@ -107,7 +107,7 @@ class SendCampaignEmailJob implements ShouldQueue
         $provider = Setting::get('active_email_provider', 'ses');
 
         try {
-            $content = (new CampaignMail($template, $emailItem->name ?? '', $emailItem->getRawOriginal('unsubscribe_token') ?? ''))
+            $content = (new CampaignMail($template, $emailItem->name ?? '', $emailItem->email, $emailItem->getRawOriginal('unsubscribe_token') ?? ''))
                 ->renderContent();
 
             $result = EmailProviderManager::send([

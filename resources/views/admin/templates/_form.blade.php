@@ -159,6 +159,38 @@
             </div>
         </div>
 
+        {{-- Merge Tags --}}
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-5">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-2">
+                <svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                Merge Tags
+            </h3>
+            <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">Click a tag to insert at cursor (subject or body).</p>
+            <div class="flex flex-wrap gap-2">
+                @php
+                    $mergeTags = [
+                        ['tag' => '{{name}}',  'desc' => "Recipient's name"],
+                        ['tag' => '{{email}}', 'desc' => "Recipient's email address"],
+                    ];
+                @endphp
+                @foreach($mergeTags as $mt)
+                <button type="button"
+                        onclick="insertMergeTag('{{ $mt['tag'] }}')"
+                        title="{{ $mt['desc'] }}"
+                        class="inline-flex items-center px-2.5 py-1 text-xs font-mono font-semibold
+                               bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300
+                               border border-brand-200 dark:border-brand-700 rounded-lg
+                               hover:bg-brand-100 dark:hover:bg-brand-800/50 transition cursor-pointer">
+                    {{ $mt['tag'] }}
+                </button>
+                @endforeach
+            </div>
+            <p class="mt-3 text-xs text-slate-400 dark:text-slate-500">Replaced with real values when email is sent.</p>
+        </div>
+
         {{-- Tips card --}}
         <div class="bg-gradient-to-br from-brand-50 to-violet-50 dark:from-brand-900/20 dark:to-violet-900/20 rounded-2xl border border-brand-100 dark:border-brand-800/50 p-5">
             <div class="flex items-center gap-2 mb-3">
@@ -218,6 +250,26 @@
             ]
         }
     });
+
+    // Merge tag insertion
+    let _lastField = 'quill';
+    const _subjectInput = document.querySelector('input[name="subject"]');
+    _subjectInput.addEventListener('focus', () => _lastField = 'subject');
+    quill.on('selection-change', range => { if (range) _lastField = 'quill'; });
+
+    function insertMergeTag(tag) {
+        if (_lastField === 'subject') {
+            const s = _subjectInput.selectionStart ?? _subjectInput.value.length;
+            const e = _subjectInput.selectionEnd   ?? _subjectInput.value.length;
+            _subjectInput.value = _subjectInput.value.slice(0, s) + tag + _subjectInput.value.slice(e);
+            _subjectInput.setSelectionRange(s + tag.length, s + tag.length);
+            _subjectInput.focus();
+        } else {
+            const range = quill.getSelection(true);
+            quill.insertText(range.index, tag, 'user');
+            quill.setSelection(range.index + tag.length);
+        }
+    }
 
     document.getElementById('quill-editor').closest('form').addEventListener('submit', function () {
         document.getElementById('body-input').value = quill.root.innerHTML;
