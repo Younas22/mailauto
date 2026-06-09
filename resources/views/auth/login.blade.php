@@ -90,7 +90,7 @@
                 </svg>
             </div>
             <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">MailAuto</h1>
-            <p class="text-sm text-slate-500 mt-1.5">1Sign in to your admin panel</p>
+            <p class="text-sm text-slate-500 mt-1.5">Sign in to your admin panel</p>
         </div>
 
         {{-- Login Card --}}
