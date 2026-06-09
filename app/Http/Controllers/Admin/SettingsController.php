@@ -65,19 +65,31 @@ class SettingsController extends Controller
     public function runQueueWorker(): \Illuminate\Http\JsonResponse
     {
         try {
-            $php     = PHP_BINARY;
-            $artisan = base_path('artisan');
+            $pending = \Illuminate\Support\Facades\DB::table('jobs')->count();
 
-            if (PHP_OS_FAMILY === 'Windows') {
-                pclose(popen("start /B \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3", 'r'));
+            if (function_exists('exec')) {
+                $php     = PHP_BINARY;
+                $artisan = base_path('artisan');
+                if (PHP_OS_FAMILY === 'Windows') {
+                    pclose(popen("start /B \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3", 'r'));
+                } else {
+                    exec("nohup \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3 --timeout=60 > /dev/null 2>&1 &");
+                }
+                $note = 'Worker started in background.';
             } else {
-                exec("nohup \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3 --timeout=60 > /dev/null 2>&1 &");
+                // Shared hosting: exec disabled — run synchronously
+                set_time_limit(300);
+                \Illuminate\Support\Facades\Artisan::call('queue:work', [
+                    '--stop-when-empty' => true,
+                    '--tries'           => 3,
+                    '--timeout'         => 60,
+                ]);
+                $note = 'Jobs processed synchronously.';
             }
 
-            $pending = \Illuminate\Support\Facades\DB::table('jobs')->count();
             return response()->json([
                 'success' => true,
-                'message' => "Queue worker started. {$pending} job(s) pending.",
+                'message' => "{$note} {$pending} job(s) were pending.",
             ]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => 'Failed: ' . $e->getMessage()]);
