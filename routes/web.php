@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\DeliverabilityController;
 use App\Http\Controllers\Admin\WarmupController;
 use App\Http\Controllers\UnsubscribeController;
+use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\Webhook\SesWebhookController;
 use App\Http\Controllers\Webhook\ResendWebhookController;
 
@@ -21,6 +22,10 @@ Route::get('/', function () {
 // ── Webhooks (public, no CSRF) ────────────────────────────────────────────────
 Route::post('/webhooks/ses',    [SesWebhookController::class,    'handle'])->name('webhooks.ses');
 Route::post('/webhooks/resend', [ResendWebhookController::class, 'handle'])->name('webhooks.resend');
+
+// ── Email tracking (public, no CSRF) ─────────────────────────────────────────
+Route::get('/track/open/{token}',  [TrackingController::class, 'open'])->name('track.open');
+Route::get('/track/click/{token}', [TrackingController::class, 'click'])->name('track.click');
 
 // ── Unsubscribe (public) ──────────────────────────────────────────────────────
 Route::get('/unsubscribe/{token}',  [UnsubscribeController::class, 'show'])->name('unsubscribe.show');

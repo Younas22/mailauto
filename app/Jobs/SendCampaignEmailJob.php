@@ -104,11 +104,12 @@ class SendCampaignEmailJob implements ShouldQueue
             $emailItem->setRawAttributes(array_merge($emailItem->getRawOriginal(), ['unsubscribe_token' => $token]));
         }
 
-        $provider = Setting::get('active_email_provider', 'ses');
+        $provider       = Setting::get('active_email_provider', 'ses');
+        $trackingToken  = Str::random(64);
 
         try {
             $content = (new CampaignMail($template, $emailItem->name ?? '', $emailItem->email, $emailItem->getRawOriginal('unsubscribe_token') ?? ''))
-                ->renderContent();
+                ->renderContent($trackingToken);
 
             $result = EmailProviderManager::send([
                 'to'      => $emailItem->email,
@@ -118,7 +119,7 @@ class SendCampaignEmailJob implements ShouldQueue
             ]);
 
             $emailItem->update(['status' => 'sent']);
-            $this->logResult($campaign->id, $emailItem, $template->id, 'sent', null, $result['provider'] ?? $provider, $result['message_id'] ?? null);
+            $this->logResult($campaign->id, $emailItem, $template->id, 'sent', null, $result['provider'] ?? $provider, $result['message_id'] ?? null, $trackingToken);
             $campaign->increment('sent_count');
         } catch (Throwable $e) {
             $retryEnabled = Setting::get('campaign_retry_failed', '1') === '1';
@@ -178,7 +179,7 @@ class SendCampaignEmailJob implements ShouldQueue
         return true;
     }
 
-    private function logResult(int $campaignId, EmailList $emailItem, ?int $templateId, string $status, ?string $error = null, ?string $provider = null, ?string $messageId = null): void
+    private function logResult(int $campaignId, EmailList $emailItem, ?int $templateId, string $status, ?string $error = null, ?string $provider = null, ?string $messageId = null, ?string $trackingToken = null): void
     {
         CampaignLog::create([
             'campaign_id'         => $campaignId,
@@ -190,6 +191,7 @@ class SendCampaignEmailJob implements ShouldQueue
             'status'              => $status,
             'error_message'       => $error,
             'sent_at'             => $status === 'sent' ? now() : null,
+            'tracking_token'      => $trackingToken,
         ]);
     }
 

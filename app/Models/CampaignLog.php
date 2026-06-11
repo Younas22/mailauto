@@ -20,6 +20,9 @@ class CampaignLog extends Model
         'error_message',
         'event_at',
         'sent_at',
+        'tracking_token',
+        'open_count',
+        'click_count',
     ];
 
     protected $casts = [

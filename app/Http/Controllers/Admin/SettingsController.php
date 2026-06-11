@@ -66,18 +66,28 @@ class SettingsController extends Controller
     {
         try {
             $pending = \Illuminate\Support\Facades\DB::table('jobs')->count();
+            $php     = PHP_BINARY;
+            $artisan = base_path('artisan');
+            $log     = storage_path('logs/queue-worker.log');
 
             if (function_exists('exec')) {
-                $php     = PHP_BINARY;
-                $artisan = base_path('artisan');
                 if (PHP_OS_FAMILY === 'Windows') {
-                    pclose(popen("start /B \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3", 'r'));
+                    // "start" is a CMD builtin, must go through cmd /C
+                    // Double-quote the title arg ("") so start parses correctly
+                    exec("cmd /C start /B \"\" \"{$php}\" \"{$artisan}\" queue:work --tries=3 --timeout=60");
                 } else {
-                    exec("nohup \"{$php}\" \"{$artisan}\" queue:work --stop-when-empty --tries=3 --timeout=60 > /dev/null 2>&1 &");
+                    exec("nohup \"{$php}\" \"{$artisan}\" queue:work --tries=3 --timeout=60 >> \"{$log}\" 2>&1 &");
+                }
+                $note = 'Worker started in background.';
+            } elseif (function_exists('popen')) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    pclose(popen("cmd /C start /B \"\" \"{$php}\" \"{$artisan}\" queue:work --tries=3 --timeout=60", 'r'));
+                } else {
+                    pclose(popen("nohup \"{$php}\" \"{$artisan}\" queue:work --tries=3 --timeout=60 >> \"{$log}\" 2>&1 &", 'r'));
                 }
                 $note = 'Worker started in background.';
             } else {
-                // Shared hosting: exec disabled — run synchronously
+                // exec/popen disabled (shared hosting) — run synchronously
                 set_time_limit(300);
                 \Illuminate\Support\Facades\Artisan::call('queue:work', [
                     '--stop-when-empty' => true,

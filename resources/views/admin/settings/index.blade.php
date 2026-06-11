@@ -1275,7 +1275,7 @@
                         </button>
                     </div>
                     <div class="px-4 py-2.5 text-xs text-slate-500 dark:text-slate-400">
-                        Processes all pending jobs and stops. Run this if a campaign is stuck or not sending.
+                        Starts a background queue worker. Run this if a campaign is stuck or not sending. The worker keeps running until the server restarts.
                     </div>
                     <div x-show="result" x-cloak x-transition
                          :class="success ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40' : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40'"

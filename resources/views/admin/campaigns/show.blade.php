@@ -141,11 +141,12 @@
     </div>
 
     {{-- Stats grid --}}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 lg:gap-4">
         @php
             $statItems = [
                 ['label' => 'Total',     'id' => 'total-count',     'value' => $campaign->total_emails, 'text' => 'text-slate-800 dark:text-slate-200',   'bg' => 'bg-slate-50 dark:bg-slate-800'],
                 ['label' => 'Sent',      'id' => 'sent-count',      'value' => $campaign->sent_count,   'text' => 'text-emerald-700 dark:text-emerald-400','bg' => 'bg-emerald-50 dark:bg-emerald-900/20'],
+                ['label' => 'Opened',    'id' => 'opened-count',    'value' => $openedCount,            'text' => 'text-violet-700 dark:text-violet-400',  'bg' => 'bg-violet-50 dark:bg-violet-900/20'],
                 ['label' => 'Failed',    'id' => 'failed-count',    'value' => $campaign->failed_count, 'text' => 'text-red-700 dark:text-red-400',        'bg' => 'bg-red-50 dark:bg-red-900/20'],
                 ['label' => 'Remaining', 'id' => 'remaining-count', 'value' => $campaign->remaining,    'text' => 'text-brand-700 dark:text-brand-400',    'bg' => 'bg-brand-50 dark:bg-brand-900/20'],
             ];
@@ -195,6 +196,8 @@
                     <th class="text-left px-5 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Recipient</th>
                     <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Template</th>
                     <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                    <th class="text-center px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Opens</th>
+                    <th class="text-center px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Clicks</th>
                     <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Time</th>
                 </tr>
             </thead>
@@ -223,6 +226,24 @@
                             </svg>
                             Failed
                         </span>
+                        @endif
+                    </td>
+                    <td class="px-4 py-3.5 text-center">
+                        @if($log->open_count > 0)
+                        <span class="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400">
+                            {{ $log->open_count }}
+                        </span>
+                        @else
+                        <span class="text-xs text-slate-300 dark:text-slate-600">—</span>
+                        @endif
+                    </td>
+                    <td class="px-4 py-3.5 text-center">
+                        @if($log->click_count > 0)
+                        <span class="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                            {{ $log->click_count }}
+                        </span>
+                        @else
+                        <span class="text-xs text-slate-300 dark:text-slate-600">—</span>
                         @endif
                     </td>
                     <td class="px-4 py-3.5 text-slate-400 dark:text-slate-500 text-xs">
