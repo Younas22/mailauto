@@ -6,31 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Models\CampaignLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 
 class MailgunReplyWebhookController extends Controller
 {
     public function handle(Request $request): Response
     {
-        // Verify Mailgun webhook signature if signing key is configured
-        $signingKey = env('MAILGUN_WEBHOOK_SIGNING_KEY', '');
-        if ($signingKey) {
-            $timestamp = $request->input('timestamp', '');
-            $token     = $request->input('token', '');
-            $signature = $request->input('signature', '');
-            $expected  = hash_hmac('sha256', $timestamp . $token, $signingKey);
+        // Log raw payload once for debugging (remove after confirmed working)
+        Log::info('[ReplyWebhook] payload', ['body' => $request->all(), 'raw' => $request->getContent()]);
 
-            if (!hash_equals($expected, $signature)) {
-                return response('forbidden', 403);
-            }
-        }
+        $recipient = $this->extractRecipient($request);
 
-        // Extract tracking token from recipient: reply+{token}@domain
-        $recipient = $request->input('recipient', '');
-        if (!preg_match('/reply\+([^@]+)@/', $recipient, $matches)) {
+        if (!$recipient || !preg_match('/reply\+([^@]+)@/i', $recipient, $matches)) {
             return response('ok', 200);
         }
 
-        $replyToken = $matches[1]; // first 57 chars of tracking_token
+        $replyToken = $matches[1];
 
         $log = CampaignLog::where('tracking_token', 'LIKE', $replyToken . '%')->first();
         if (!$log) {
@@ -40,9 +31,50 @@ class MailgunReplyWebhookController extends Controller
         $log->increment('reply_count');
         $log->update([
             'replied_at' => now(),
-            'replied_by' => $request->input('sender', ''),
+            'replied_by' => $this->extractSender($request),
         ]);
 
         return response('ok', 200);
+    }
+
+    private function extractRecipient(Request $request): ?string
+    {
+        // ForwardEmail JSON format: "to" field
+        $to = $request->input('to');
+        if ($to) {
+            if (is_string($to)) return $to;
+            if (is_array($to)) {
+                $first = $to[0] ?? null;
+                if (is_string($first)) return $first;
+                if (is_array($first)) return $first['address'] ?? $first['email'] ?? null;
+            }
+        }
+
+        // Mailgun format
+        $recipient = $request->input('recipient');
+        if ($recipient) return $recipient;
+
+        // ForwardEmail: envelope.to
+        $envelope = $request->input('envelope');
+        if ($envelope) {
+            $envTo = is_array($envelope) ? ($envelope['to'] ?? null) : null;
+            if (is_string($envTo)) return $envTo;
+            if (is_array($envTo)) return $envTo[0] ?? null;
+        }
+
+        return null;
+    }
+
+    private function extractSender(Request $request): string
+    {
+        // ForwardEmail JSON: "from" field
+        $from = $request->input('from');
+        if ($from) {
+            if (is_string($from)) return $from;
+            if (is_array($from)) return $from['address'] ?? $from['email'] ?? '';
+        }
+
+        // Mailgun format
+        return $request->input('sender', '');
     }
 }
