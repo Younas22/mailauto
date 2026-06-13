@@ -111,11 +111,14 @@ class SendCampaignEmailJob implements ShouldQueue
             $content = (new CampaignMail($template, $emailItem->name ?? '', $emailItem->email, $emailItem->getRawOriginal('unsubscribe_token') ?? ''))
                 ->renderContent($trackingToken);
 
+            $replyDomain = parse_url(config('app.url'), PHP_URL_HOST);
+
             $result = EmailProviderManager::send([
-                'to'      => $emailItem->email,
-                'to_name' => $emailItem->name ?? '',
-                'subject' => $content['subject'],
-                'html'    => $content['html'],
+                'to'       => $emailItem->email,
+                'to_name'  => $emailItem->name ?? '',
+                'subject'  => $content['subject'],
+                'html'     => $content['html'],
+                'reply_to' => 'reply+' . $trackingToken . '@' . $replyDomain,
             ]);
 
             $emailItem->update(['status' => 'sent']);

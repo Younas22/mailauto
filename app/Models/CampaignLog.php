@@ -23,11 +23,15 @@ class CampaignLog extends Model
         'tracking_token',
         'open_count',
         'click_count',
+        'reply_count',
+        'replied_at',
+        'replied_by',
     ];
 
     protected $casts = [
-        'sent_at'  => 'datetime',
-        'event_at' => 'datetime',
+        'sent_at'    => 'datetime',
+        'event_at'   => 'datetime',
+        'replied_at' => 'datetime',
     ];
 
     public function campaign(): BelongsTo

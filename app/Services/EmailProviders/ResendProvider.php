@@ -25,12 +25,18 @@ class ResendProvider implements EmailProviderInterface
         }
 
         try {
-            $email = Resend::client($apiKey)->emails->send([
+            $payload = [
                 'from'    => $this->formatAddress($from, $fromName),
                 'to'      => [$this->formatAddress($data['to'], $data['to_name'] ?? null)],
                 'subject' => $data['subject'],
                 'html'    => $data['html'],
-            ]);
+            ];
+
+            if (!empty($data['reply_to'])) {
+                $payload['reply_to'] = [$data['reply_to']];
+            }
+
+            $email = Resend::client($apiKey)->emails->send($payload);
         } catch (Throwable $e) {
             throw new RuntimeException('Resend send failed: ' . $e->getMessage(), previous: $e);
         }

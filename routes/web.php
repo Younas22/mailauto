@@ -14,14 +14,16 @@ use App\Http\Controllers\UnsubscribeController;
 use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\Webhook\SesWebhookController;
 use App\Http\Controllers\Webhook\ResendWebhookController;
+use App\Http\Controllers\Webhook\MailgunReplyWebhookController;
 
 Route::get('/', function () {
     return redirect()->route(auth()->check() ? 'admin.dashboard' : 'login');
 });
 
 // ── Webhooks (public, no CSRF) ────────────────────────────────────────────────
-Route::post('/webhooks/ses',    [SesWebhookController::class,    'handle'])->name('webhooks.ses');
-Route::post('/webhooks/resend', [ResendWebhookController::class, 'handle'])->name('webhooks.resend');
+Route::post('/webhooks/ses',           [SesWebhookController::class,          'handle'])->name('webhooks.ses');
+Route::post('/webhooks/resend',        [ResendWebhookController::class,       'handle'])->name('webhooks.resend');
+Route::post('/webhooks/mailgun-reply', [MailgunReplyWebhookController::class, 'handle'])->name('webhooks.mailgun-reply');
 
 // ── Email tracking (public, no CSRF) ─────────────────────────────────────────
 Route::get('/track/open/{token}',  [TrackingController::class, 'open'])->name('track.open');

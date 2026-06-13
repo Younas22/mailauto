@@ -68,10 +68,11 @@ class CampaignController extends Controller
     public function show(Campaign $campaign): View
     {
         $campaign->load('emailGroup');
-        $recentLogs  = $campaign->logs()->with('template')->latest()->limit(50)->get();
-        $openedCount = $campaign->logs()->where('open_count', '>', 0)->count();
+        $recentLogs   = $campaign->logs()->with('template')->latest()->limit(50)->get();
+        $openedCount  = $campaign->logs()->where('open_count', '>', 0)->count();
+        $repliedCount = $campaign->logs()->where('reply_count', '>', 0)->count();
 
-        return view('admin.campaigns.show', compact('campaign', 'recentLogs', 'openedCount'));
+        return view('admin.campaigns.show', compact('campaign', 'recentLogs', 'openedCount', 'repliedCount'));
     }
 
     public function edit(Campaign $campaign): View

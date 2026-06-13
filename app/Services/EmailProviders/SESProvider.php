@@ -32,7 +32,7 @@ class SESProvider implements EmailProviderInterface
         ]);
 
         try {
-            $result = $client->sendEmail([
+            $params = [
                 'Source'      => $this->formatAddress($from, $fromName),
                 'Destination' => [
                     'ToAddresses' => [$this->formatAddress($data['to'], $data['to_name'] ?? null)],
@@ -41,7 +41,13 @@ class SESProvider implements EmailProviderInterface
                     'Subject' => ['Data' => $data['subject'], 'Charset' => 'UTF-8'],
                     'Body'    => ['Html' => ['Data' => $data['html'], 'Charset' => 'UTF-8']],
                 ],
-            ]);
+            ];
+
+            if (!empty($data['reply_to'])) {
+                $params['ReplyToAddresses'] = [$data['reply_to']];
+            }
+
+            $result = $client->sendEmail($params);
         } catch (Throwable $e) {
             throw new RuntimeException('Amazon SES send failed: ' . $e->getMessage(), previous: $e);
         }
