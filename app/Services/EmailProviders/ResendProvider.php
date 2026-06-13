@@ -33,7 +33,7 @@ class ResendProvider implements EmailProviderInterface
             ];
 
             if (!empty($data['reply_to'])) {
-                $payload['reply_to'] = [$data['reply_to']];
+                $payload['reply_to'] = $data['reply_to'];
             }
 
             $email = Resend::client($apiKey)->emails->send($payload);
