@@ -30,9 +30,9 @@ class MailgunReplyWebhookController extends Controller
             return response('ok', 200);
         }
 
-        $trackingToken = $matches[1];
+        $replyToken = $matches[1]; // first 57 chars of tracking_token
 
-        $log = CampaignLog::where('tracking_token', $trackingToken)->first();
+        $log = CampaignLog::where('tracking_token', 'LIKE', $replyToken . '%')->first();
         if (!$log) {
             return response('ok', 200);
         }
