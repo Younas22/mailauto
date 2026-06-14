@@ -114,13 +114,21 @@ class SendCampaignEmailJob implements ShouldQueue
             $replyDomain  = parse_url(config('app.url'), PHP_URL_HOST);
             $replyToken   = substr($trackingToken, 0, 40);
             $fromName     = Setting::get('mail_from_name', 'Support');
+            $adminEmail   = Setting::get('mail_from_email')
+                         ?: Setting::get('resend_sender_email')
+                         ?: Setting::get('ses_sender_email');
+
+            $replyTo = [$fromName . ' <' . $replyToken . '@' . $replyDomain . '>'];
+            if ($adminEmail) {
+                $replyTo[] = $adminEmail;
+            }
 
             $result = EmailProviderManager::send([
                 'to'       => $emailItem->email,
                 'to_name'  => $emailItem->name ?? '',
                 'subject'  => $content['subject'],
                 'html'     => $content['html'],
-                'reply_to' => $fromName . ' <' . $replyToken . '@' . $replyDomain . '>',
+                'reply_to' => $replyTo,
             ]);
 
             $emailItem->update(['status' => 'sent']);

@@ -44,7 +44,8 @@ class SESProvider implements EmailProviderInterface
             ];
 
             if (!empty($data['reply_to'])) {
-                $params['ReplyToAddresses'] = [$data['reply_to']];
+                $replyTo = is_array($data['reply_to']) ? $data['reply_to'] : [$data['reply_to']];
+                $params['ReplyToAddresses'] = $replyTo;
             }
 
             $result = $client->sendEmail($params);
