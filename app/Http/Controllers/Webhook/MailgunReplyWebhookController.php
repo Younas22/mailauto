@@ -17,7 +17,12 @@ class MailgunReplyWebhookController extends Controller
 
         $recipient = $this->extractRecipient($request);
 
-        if (!$recipient || !preg_match('/reply\+([^@]+)@/i', $recipient, $matches)) {
+        if (!$recipient) {
+            return response('ok', 200);
+        }
+
+        // Extract local part (token) from email: token@domain
+        if (!preg_match('/^([^@]+)@/', $recipient, $matches)) {
             return response('ok', 200);
         }
 
