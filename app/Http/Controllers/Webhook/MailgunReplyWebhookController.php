@@ -44,39 +44,40 @@ class MailgunReplyWebhookController extends Controller
 
     private function extractRecipient(Request $request): ?string
     {
-        // ForwardEmail JSON format: "to" field
+        // ForwardEmail: "recipients" array (simplest)
+        $recipients = $request->input('recipients');
+        if (!empty($recipients) && is_array($recipients)) {
+            return $recipients[0];
+        }
+
+        // ForwardEmail: "session.recipient"
+        $session = $request->input('session');
+        if (!empty($session['recipient'])) {
+            return $session['recipient'];
+        }
+
+        // ForwardEmail: "to.value[0].address"
         $to = $request->input('to');
-        if ($to) {
-            if (is_string($to)) return $to;
-            if (is_array($to)) {
-                $first = $to[0] ?? null;
-                if (is_string($first)) return $first;
-                if (is_array($first)) return $first['address'] ?? $first['email'] ?? null;
-            }
+        if (is_array($to) && !empty($to['value'][0]['address'])) {
+            return $to['value'][0]['address'];
         }
 
         // Mailgun format
-        $recipient = $request->input('recipient');
-        if ($recipient) return $recipient;
-
-        // ForwardEmail: envelope.to
-        $envelope = $request->input('envelope');
-        if ($envelope) {
-            $envTo = is_array($envelope) ? ($envelope['to'] ?? null) : null;
-            if (is_string($envTo)) return $envTo;
-            if (is_array($envTo)) return $envTo[0] ?? null;
-        }
-
-        return null;
+        return $request->input('recipient');
     }
 
     private function extractSender(Request $request): string
     {
-        // ForwardEmail JSON: "from" field
+        // ForwardEmail: "session.sender"
+        $session = $request->input('session');
+        if (!empty($session['sender'])) {
+            return $session['sender'];
+        }
+
+        // ForwardEmail: "from.value[0].address"
         $from = $request->input('from');
-        if ($from) {
-            if (is_string($from)) return $from;
-            if (is_array($from)) return $from['address'] ?? $from['email'] ?? '';
+        if (is_array($from) && !empty($from['value'][0]['address'])) {
+            return $from['value'][0]['address'];
         }
 
         // Mailgun format
