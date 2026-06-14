@@ -113,13 +113,14 @@ class SendCampaignEmailJob implements ShouldQueue
 
             $replyDomain  = parse_url(config('app.url'), PHP_URL_HOST);
             $replyToken   = substr($trackingToken, 0, 57); // reply+ (6) + 57 = 63 chars, within RFC limit
+            $fromName     = Setting::get('mail_from_name', 'Support');
 
             $result = EmailProviderManager::send([
                 'to'       => $emailItem->email,
                 'to_name'  => $emailItem->name ?? '',
                 'subject'  => $content['subject'],
                 'html'     => $content['html'],
-                'reply_to' => 'reply+' . $replyToken . '@' . $replyDomain,
+                'reply_to' => $fromName . ' <reply+' . $replyToken . '@' . $replyDomain . '>',
             ]);
 
             $emailItem->update(['status' => 'sent']);
