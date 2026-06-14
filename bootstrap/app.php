@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             '/webhooks/ses',
             '/webhooks/resend',
+            '/webhooks/mailgun-reply',
         ]);
 
         $middleware->web(append: [
