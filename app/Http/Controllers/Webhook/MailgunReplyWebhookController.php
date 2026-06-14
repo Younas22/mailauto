@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
 use App\Models\CampaignLog;
+use App\Models\Setting;
+use App\Services\EmailProviders\EmailProviderManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -12,16 +14,12 @@ class MailgunReplyWebhookController extends Controller
 {
     public function handle(Request $request): Response
     {
-        // Log raw payload once for debugging (remove after confirmed working)
-        Log::info('[ReplyWebhook] payload', ['body' => $request->all(), 'raw' => $request->getContent()]);
-
         $recipient = $this->extractRecipient($request);
 
         if (!$recipient) {
             return response('ok', 200);
         }
 
-        // Extract local part (token) from email: token@domain
         if (!preg_match('/^([^@]+)@/', $recipient, $matches)) {
             return response('ok', 200);
         }
@@ -33,13 +31,42 @@ class MailgunReplyWebhookController extends Controller
             return response('ok', 200);
         }
 
+        $sender = $this->extractSender($request);
+
         $log->increment('reply_count');
         $log->update([
             'replied_at' => now(),
-            'replied_by' => $this->extractSender($request),
+            'replied_by' => $sender,
         ]);
 
+        $this->forwardReplyToAdmin($request, $log, $sender);
+
         return response('ok', 200);
+    }
+
+    private function forwardReplyToAdmin(Request $request, CampaignLog $log, string $sender): void
+    {
+        $adminEmail = Setting::get('mail_from_email');
+        if (!$adminEmail) return;
+
+        $adminName  = Setting::get('mail_from_name', 'MailAuto');
+        $from       = $request->input('from');
+        $senderName = is_array($from) ? ($from['value'][0]['name'] ?? $sender) : $sender;
+        $subject    = $request->input('subject', 'Reply to your campaign');
+        $html       = $request->input('html') ?: nl2br(e($request->input('text', '')));
+
+        try {
+            EmailProviderManager::send([
+                'to'      => $adminEmail,
+                'to_name' => $adminName,
+                'subject' => 'Fwd: ' . $subject,
+                'html'    => '<p><strong>From:</strong> ' . e($senderName) . ' &lt;' . e($sender) . '&gt;</p>'
+                           . '<p><strong>Replied to:</strong> ' . e($log->email) . '</p>'
+                           . '<hr>' . $html,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[ReplyWebhook] Forward to admin failed: ' . $e->getMessage());
+        }
     }
 
     private function extractRecipient(Request $request): ?string
