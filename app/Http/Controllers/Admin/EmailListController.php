@@ -12,8 +12,19 @@ class EmailListController extends Controller
 {
     public function index(Request $request)
     {
-        $status = $request->query('status');
+        $status  = $request->query('status');
         $groupId = $request->query('group');
+        $search  = trim($request->query('search', ''));
+        $perPage = $request->query('per_page', 20);
+
+        $allowedPerPage = [10, 20, 30, 50, 100];
+        if ($perPage === 'all') {
+            // keep as string 'all'
+        } elseif (in_array((int) $perPage, $allowedPerPage)) {
+            $perPage = (int) $perPage;
+        } else {
+            $perPage = 20;
+        }
 
         $query = EmailList::with('group')->latest();
 
@@ -25,7 +36,17 @@ class EmailListController extends Controller
             $query->where('group_id', $groupId);
         }
 
-        $emails = $query->paginate(15)->withQueryString();
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('email', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        $emails = $perPage === 'all'
+            ? $query->paginate(999999)->withQueryString()
+            : $query->paginate($perPage)->withQueryString();
+
         $counts = [
             'total'   => EmailList::count(),
             'pending' => EmailList::where('status', 'pending')->count(),
@@ -35,7 +56,7 @@ class EmailListController extends Controller
 
         $groups = EmailGroup::withCount('emails')->orderBy('name')->get();
 
-        return view('admin.email-lists.index', compact('emails', 'counts', 'status', 'groups', 'groupId'));
+        return view('admin.email-lists.index', compact('emails', 'counts', 'status', 'groups', 'groupId', 'search', 'perPage'));
     }
 
     public function showImport()
