@@ -94,12 +94,25 @@
         if (confirm('Remove ' + this.selected.length + ' selected contact(s)? This cannot be undone.')) {
             document.getElementById('bulk-delete-form').submit();
         }
+    },
+    bulkSetStatus(status) {
+        document.getElementById('bulk-status-value').value = status;
+        document.getElementById('bulk-status-form').submit();
     }
 }">
 
 {{-- Hidden bulk-delete form --}}
 <form id="bulk-delete-form" method="POST" action="{{ route('admin.email-lists.bulk-destroy') }}">
     @csrf @method('DELETE')
+    <template x-for="id in selected" :key="id">
+        <input type="hidden" name="ids[]" :value="id">
+    </template>
+</form>
+
+{{-- Hidden bulk-status form --}}
+<form id="bulk-status-form" method="POST" action="{{ route('admin.email-lists.bulk-update-status') }}">
+    @csrf @method('PATCH')
+    <input type="hidden" name="status" id="bulk-status-value">
     <template x-for="id in selected" :key="id">
         <input type="hidden" name="ids[]" :value="id">
     </template>
@@ -189,20 +202,59 @@
 
     {{-- Row 2: Actions + Per page --}}
     <div class="flex items-center gap-2 flex-wrap">
-        {{-- Bulk delete button --}}
-        <button type="button"
-                x-show="selected.length > 0"
-                x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                @click="confirmBulkDelete()"
-                class="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
-            Delete Selected (<span x-text="selected.length"></span>)
-        </button>
+        {{-- Bulk action buttons (visible when rows selected) --}}
+        <div x-show="selected.length > 0"
+             x-transition:enter="transition ease-out duration-150"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             class="flex items-center gap-2">
+
+            {{-- Bulk status dropdown --}}
+            <div x-data="{ open: false }" class="relative">
+                <button @click="open = !open" @click.outside="open = false" type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-semibold rounded-xl transition shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    Set Status
+                    <svg class="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open"
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     class="absolute z-20 mt-1 left-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden w-36 py-1">
+                    <button type="button" @click="bulkSetStatus('pending')"
+                            class="w-full text-left px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span> Pending
+                    </button>
+                    <button type="button" @click="bulkSetStatus('sent')"
+                            class="w-full text-left px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span> Sent
+                    </button>
+                    <button type="button" @click="bulkSetStatus('failed')"
+                            class="w-full text-left px-3 py-2 text-xs font-semibold text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0"></span> Failed
+                    </button>
+                </div>
+            </div>
+
+            {{-- Bulk delete button --}}
+            <button type="button"
+                    @click="confirmBulkDelete()"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Delete (<span x-text="selected.length"></span>)
+            </button>
+        </div>
 
         <div class="ml-auto flex items-center gap-3">
             {{-- Per page selector --}}
@@ -278,19 +330,49 @@
                 </td>
                 <td class="px-4 py-3.5 text-slate-500 dark:text-slate-400">{{ $contact->name ?: '—' }}</td>
                 <td class="px-4 py-3.5">
-                    @if($contact->status === 'pending')
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Pending
-                        </span>
-                    @elseif($contact->status === 'sent')
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold rounded-full">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Sent
-                        </span>
-                    @else
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">
-                            <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> Failed
-                        </span>
-                    @endif
+                    <div x-data="{ open: false }" class="relative inline-block">
+                        <button @click="open = !open" @click.outside="open = false" type="button"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full transition
+                                       @if($contact->status === 'pending') bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30
+                                       @elseif($contact->status === 'sent') bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30
+                                       @else bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 @endif">
+                            <span class="w-1.5 h-1.5 rounded-full @if($contact->status === 'pending') bg-amber-400 @elseif($contact->status === 'sent') bg-emerald-500 @else bg-red-400 @endif"></span>
+                            {{ ucfirst($contact->status) }}
+                            <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div x-show="open"
+                             x-transition:enter="transition ease-out duration-100"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-75"
+                             x-transition:leave-start="opacity-100 scale-100"
+                             x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute z-20 mt-1 left-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden w-32 py-1">
+                            <form method="POST" action="{{ route('admin.email-lists.update-status', $contact) }}">
+                                @csrf @method('PATCH')
+                                <input type="hidden" name="status" value="pending">
+                                <button type="submit" class="w-full text-left px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition flex items-center gap-2 {{ $contact->status === 'pending' ? 'bg-amber-50 dark:bg-amber-900/20' : '' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span> Pending
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.email-lists.update-status', $contact) }}">
+                                @csrf @method('PATCH')
+                                <input type="hidden" name="status" value="sent">
+                                <button type="submit" class="w-full text-left px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition flex items-center gap-2 {{ $contact->status === 'sent' ? 'bg-emerald-50 dark:bg-emerald-900/20' : '' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span> Sent
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.email-lists.update-status', $contact) }}">
+                                @csrf @method('PATCH')
+                                <input type="hidden" name="status" value="failed">
+                                <button type="submit" class="w-full text-left px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center gap-2 {{ $contact->status === 'failed' ? 'bg-red-50 dark:bg-red-900/20' : '' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0"></span> Failed
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </td>
                 <td class="px-4 py-3.5 text-slate-400 dark:text-slate-500 text-xs">{{ $contact->created_at->format('M d, Y') }}</td>
                 <td class="px-4 py-3.5 text-right">
@@ -385,13 +467,45 @@
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
-                @if($contact->status === 'pending')
-                    <span class="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">Pending</span>
-                @elseif($contact->status === 'sent')
-                    <span class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold rounded-full">Sent</span>
-                @else
-                    <span class="px-2 py-0.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">Failed</span>
-                @endif
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" @click.outside="open = false" type="button"
+                            class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full transition
+                                   @if($contact->status === 'pending') bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400
+                                   @elseif($contact->status === 'sent') bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400
+                                   @else bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 @endif">
+                        {{ ucfirst($contact->status) }}
+                        <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open"
+                         x-transition:enter="transition ease-out duration-100"
+                         x-transition:enter-start="opacity-0 scale-95"
+                         x-transition:enter-end="opacity-100 scale-100"
+                         class="absolute z-20 mt-1 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden w-28 py-1">
+                        <form method="POST" action="{{ route('admin.email-lists.update-status', $contact) }}">
+                            @csrf @method('PATCH')
+                            <input type="hidden" name="status" value="pending">
+                            <button type="submit" class="w-full text-left px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition flex items-center gap-2 {{ $contact->status === 'pending' ? 'bg-amber-50 dark:bg-amber-900/20' : '' }}">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span> Pending
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ route('admin.email-lists.update-status', $contact) }}">
+                            @csrf @method('PATCH')
+                            <input type="hidden" name="status" value="sent">
+                            <button type="submit" class="w-full text-left px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition flex items-center gap-2 {{ $contact->status === 'sent' ? 'bg-emerald-50 dark:bg-emerald-900/20' : '' }}">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span> Sent
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ route('admin.email-lists.update-status', $contact) }}">
+                            @csrf @method('PATCH')
+                            <input type="hidden" name="status" value="failed">
+                            <button type="submit" class="w-full text-left px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center gap-2 {{ $contact->status === 'failed' ? 'bg-red-50 dark:bg-red-900/20' : '' }}">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0"></span> Failed
+                            </button>
+                        </form>
+                    </div>
+                </div>
                 <form method="POST" action="{{ route('admin.email-lists.destroy', $contact) }}"
                       onsubmit="return confirm('Remove?')">
                     @csrf @method('DELETE')
@@ -421,10 +535,40 @@
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
-        <div class="flex items-center gap-3 bg-slate-900 dark:bg-slate-700 text-white px-5 py-3 rounded-2xl shadow-xl">
-            <span class="text-sm font-medium" x-text="selected.length + ' selected'"></span>
+        <div class="flex items-center gap-2 bg-slate-900 dark:bg-slate-700 text-white px-4 py-3 rounded-2xl shadow-xl">
+            <span class="text-sm font-medium mr-1" x-text="selected.length + ' selected'"></span>
+
+            {{-- Mobile bulk status --}}
+            <div x-data="{ open: false }" class="relative">
+                <button @click="open = !open" @click.outside="open = false" type="button"
+                        class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 dark:bg-slate-600 text-white text-xs font-semibold rounded-lg transition hover:bg-slate-600 dark:hover:bg-slate-500">
+                    Status
+                    <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open"
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     class="absolute z-20 bottom-10 left-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden w-28 py-1">
+                    <button type="button" @click="bulkSetStatus('pending')"
+                            class="w-full text-left px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Pending
+                    </button>
+                    <button type="button" @click="bulkSetStatus('sent')"
+                            class="w-full text-left px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Sent
+                    </button>
+                    <button type="button" @click="bulkSetStatus('failed')"
+                            class="w-full text-left px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> Failed
+                    </button>
+                </div>
+            </div>
+
             <button type="button" @click="confirmBulkDelete()"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition">
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>

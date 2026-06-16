@@ -55,8 +55,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/email-lists',          [EmailListController::class, 'index'])->name('email-lists.index');
     Route::get('/email-lists/import',   [EmailListController::class, 'showImport'])->name('email-lists.import');
     Route::post('/email-lists/import',  [EmailListController::class, 'import'])->name('email-lists.store');
-    Route::delete('/email-lists/bulk',        [EmailListController::class, 'bulkDelete'])->name('email-lists.bulk-destroy');
-    Route::delete('/email-lists/{emailList}', [EmailListController::class, 'destroy'])->name('email-lists.destroy');
+    Route::delete('/email-lists/bulk',                    [EmailListController::class, 'bulkDelete'])->name('email-lists.bulk-destroy');
+    Route::patch('/email-lists/bulk/status',              [EmailListController::class, 'bulkUpdateStatus'])->name('email-lists.bulk-update-status');
+    Route::delete('/email-lists/{emailList}',             [EmailListController::class, 'destroy'])->name('email-lists.destroy');
+    Route::patch('/email-lists/{emailList}/status',       [EmailListController::class, 'updateStatus'])->name('email-lists.update-status');
     Route::get('/email-lists/sample',   [EmailListController::class, 'sampleCsv'])->name('email-lists.sample');
 
     // Email Logs

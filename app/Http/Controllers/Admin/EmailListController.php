@@ -196,6 +196,24 @@ class EmailListController extends Controller
         return back()->with('success', "{$count} contact(s) removed.");
     }
 
+    public function bulkUpdateStatus(Request $request)
+    {
+        $request->validate([
+            'ids'    => 'required|array',
+            'ids.*'  => 'integer',
+            'status' => 'required|in:pending,sent,failed',
+        ]);
+        $count = EmailList::whereIn('id', $request->ids)->update(['status' => $request->status]);
+        return back()->with('success', "{$count} contact(s) marked as {$request->status}.");
+    }
+
+    public function updateStatus(Request $request, EmailList $emailList)
+    {
+        $request->validate(['status' => 'required|in:pending,sent,failed']);
+        $emailList->update(['status' => $request->status]);
+        return back()->with('success', 'Status updated to ' . $request->status . '.');
+    }
+
     public function destroy(EmailList $emailList)
     {
         $emailList->delete();
