@@ -106,20 +106,54 @@
 </form>
 
 {{-- Header bar --}}
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-    {{-- Status filter tabs --}}
-    <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit">
-        @foreach([null => 'All', 'pending' => 'Pending', 'sent' => 'Sent', 'failed' => 'Failed'] as $val => $label)
-        <a href="{{ route('admin.email-lists.index', $val ? ['status' => $val] : []) }}"
-           class="px-3 py-1.5 text-xs font-semibold rounded-lg transition
-                  {{ $status === $val || ($val === null && !$status)
-                     ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-sm'
-                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200' }}">
-            {{ $label }}
-        </a>
-        @endforeach
+<div class="flex flex-col gap-3 mb-4">
+
+    {{-- Row 1: Filters --}}
+    <div class="flex flex-wrap items-center gap-2">
+        {{-- Status filter tabs --}}
+        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit">
+            @foreach(['' => 'All', 'pending' => 'Pending', 'sent' => 'Sent', 'failed' => 'Failed'] as $val => $label)
+            <a href="{{ route('admin.email-lists.index', array_filter(['status' => $val ?: null, 'group' => $groupId ?: null])) }}"
+               class="px-3 py-1.5 text-xs font-semibold rounded-lg transition
+                      {{ $status === $val || ($val === '' && !$status)
+                         ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-sm'
+                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200' }}">
+                {{ $label }}
+            </a>
+            @endforeach
+        </div>
+
+        {{-- List Name filter --}}
+        @if($groups->count() > 0)
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">List:</span>
+            <select onchange="window.location.href=this.value"
+                    class="px-3 py-2 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-xl
+                           bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300
+                           focus:outline-none focus:ring-2 focus:ring-brand-400/30 focus:border-brand-400
+                           cursor-pointer transition">
+                <option value="{{ route('admin.email-lists.index', array_filter(['status' => $status ?: null])) }}"
+                        {{ !$groupId ? 'selected' : '' }}>All Lists</option>
+                @foreach($groups as $g)
+                <option value="{{ route('admin.email-lists.index', array_filter(['status' => $status ?: null, 'group' => $g->id])) }}"
+                        {{ $groupId == $g->id ? 'selected' : '' }}>
+                    {{ $g->name }} ({{ number_format($g->emails_count) }})
+                </option>
+                @endforeach
+            </select>
+            @if($groupId)
+            <a href="{{ route('admin.email-lists.index', array_filter(['status' => $status ?: null])) }}"
+               class="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition" title="Clear filter">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </a>
+            @endif
+        </div>
+        @endif
     </div>
 
+    {{-- Row 2: Actions --}}
     <div class="flex items-center gap-2">
         {{-- Bulk delete button --}}
         <button type="button"
@@ -144,6 +178,7 @@
             Import CSV
         </a>
     </div>
+
 </div>
 
 {{-- Desktop table --}}

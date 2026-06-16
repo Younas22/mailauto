@@ -40,7 +40,7 @@ class EmailListController extends Controller
 
     public function showImport()
     {
-        $groups = EmailGroup::orderBy('name')->get();
+        $groups = EmailGroup::withCount('emails')->orderBy('name')->get();
         return view('admin.email-lists.import', compact('groups'));
     }
 

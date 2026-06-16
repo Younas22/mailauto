@@ -28,12 +28,22 @@
 </div>
 @endif
 
+@php
+    $oldListName = old('list_name', '');
+    $matchedGroup = $groups->firstWhere('name', $oldListName);
+    $initialMode = (!$oldListName || $matchedGroup) && $groups->count() > 0 ? 'existing' : 'new';
+    $initialSelectedGroup = $matchedGroup ? $matchedGroup->name : ($groups->first() ? $groups->first()->name : '');
+    $initialNewName = !$matchedGroup ? $oldListName : '';
+@endphp
 <div
     x-data="{
         dragging: false,
         file: null,
         uploading: false,
         progress: 0,
+        mode: {{ json_encode($initialMode) }},
+        selectedGroup: {{ json_encode($initialSelectedGroup) }},
+        newName: {{ json_encode($initialNewName) }},
         handleDrop(e) {
             this.dragging = false;
             const f = e.dataTransfer.files[0];
@@ -50,6 +60,8 @@
         handleChange(e) { const f = e.target.files[0]; if (f) this.setFile(f); },
         startUpload() {
             if (!this.file) return;
+            const name = this.mode === 'existing' ? this.selectedGroup : this.newName;
+            if (!name || !name.trim()) { alert('Please enter or select a list name.'); return; }
             this.uploading = true; this.progress = 0;
             let p = 0;
             const interval = setInterval(() => {
@@ -84,20 +96,50 @@
                 <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     List Name <span class="text-red-500">*</span>
                 </label>
-                <input type="text" name="list_name" required
-                       value="{{ old('list_name') }}"
-                       placeholder="e.g. Newsletter June 2025"
-                       list="existing-groups"
-                       class="w-full px-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
-                              focus:outline-none focus:ring-2 focus:ring-brand-400/30 focus:border-brand-400
-                              bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200
-                              placeholder-slate-400 dark:placeholder-slate-500 transition">
-                <datalist id="existing-groups">
-                    @foreach($groups as $g)
-                    <option value="{{ $g->name }}">
-                    @endforeach
-                </datalist>
-                <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">Give this import a name, or match an existing list to append to it.</p>
+
+                {{-- Hidden input that submits the actual value --}}
+                <input type="hidden" name="list_name" :value="mode === 'existing' ? selectedGroup : newName">
+
+                @if($groups->count() > 0)
+                {{-- Mode toggle --}}
+                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit mb-3">
+                    <button type="button" @click="mode='existing'"
+                            :class="mode==='existing' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
+                            class="px-3 py-1.5 text-xs font-semibold rounded-lg transition">
+                        Add to Existing List
+                    </button>
+                    <button type="button" @click="mode='new'"
+                            :class="mode==='new' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
+                            class="px-3 py-1.5 text-xs font-semibold rounded-lg transition">
+                        Create New List
+                    </button>
+                </div>
+
+                {{-- Select existing list --}}
+                <div x-show="mode === 'existing'" x-cloak>
+                    <select x-model="selectedGroup"
+                            class="w-full px-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                                   focus:outline-none focus:ring-2 focus:ring-brand-400/30 focus:border-brand-400
+                                   bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition cursor-pointer">
+                        @foreach($groups as $g)
+                        <option value="{{ $g->name }}">{{ $g->name }} — {{ number_format($g->emails_count) }} contacts</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">New leads will be appended to this list. Duplicates are skipped automatically.</p>
+                </div>
+                @endif
+
+                {{-- Create new list --}}
+                <div x-show="mode === 'new'" {{ $groups->count() > 0 ? 'x-cloak' : '' }}>
+                    <input type="text" x-model="newName"
+                           placeholder="e.g. Newsletter June 2025"
+                           class="w-full px-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                                  focus:outline-none focus:ring-2 focus:ring-brand-400/30 focus:border-brand-400
+                                  bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200
+                                  placeholder-slate-400 dark:placeholder-slate-500 transition">
+                    <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">A new list will be created with this name.</p>
+                </div>
+
                 @error('list_name')
                     <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                 @enderror
