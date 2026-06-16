@@ -79,25 +79,57 @@
     {{-- ─── LEFT: Main Fields ─── --}}
     <div class="lg:col-span-2 space-y-5">
 
-        {{-- Title --}}
-        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-5 lg:p-6">
-            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Template Title <span class="text-red-500">*</span>
-            </label>
-            <input type="text" name="title" value="{{ old('title', $template->title ?? '') }}"
-                   placeholder="e.g. Welcome Email, Monthly Newsletter…"
-                   class="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800
-                          border @error('title') border-red-400 dark:border-red-700 bg-red-50 dark:bg-red-900/20 @else border-slate-200 dark:border-slate-700 @enderror
-                          rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 outline-none
-                          focus:ring-2 focus:ring-brand-400/30 focus:border-brand-400 transition" />
-            @error('title')
-                <p class="mt-1.5 text-xs text-red-500 dark:text-red-400 flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        {{-- Title + Category --}}
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-5 lg:p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Template Title <span class="text-red-500">*</span>
+                </label>
+                <input type="text" name="title" value="{{ old('title', $template->title ?? '') }}"
+                       placeholder="e.g. Welcome Email, Monthly Newsletter…"
+                       class="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800
+                              border @error('title') border-red-400 dark:border-red-700 bg-red-50 dark:bg-red-900/20 @else border-slate-200 dark:border-slate-700 @enderror
+                              rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 outline-none
+                              focus:ring-2 focus:ring-brand-400/30 focus:border-brand-400 transition" />
+                @error('title')
+                    <p class="mt-1.5 text-xs text-red-500 dark:text-red-400 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        {{ $message }}
+                    </p>
+                @enderror
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300">Category</label>
+                    <a href="{{ route('admin.template-categories.index') }}"
+                       class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline transition">
+                        + Manage Categories
+                    </a>
+                </div>
+                @php $dbCategories = \App\Models\TemplateCategory::orderBy('name')->pluck('name'); @endphp
+                <div class="relative">
+                    <select name="category"
+                            class="appearance-none w-full px-4 py-2.5 pr-10 text-sm bg-slate-50 dark:bg-slate-800
+                                   border border-slate-200 dark:border-slate-700 rounded-xl
+                                   text-slate-800 dark:text-slate-200 outline-none cursor-pointer
+                                   focus:ring-2 focus:ring-brand-400/30 focus:border-brand-400 transition">
+                        <option value="">— No Category —</option>
+                        @foreach($dbCategories as $opt)
+                            <option value="{{ $opt }}" {{ old('category', $template->category ?? '') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                        @endforeach
+                    </select>
+                    <svg class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
-                    {{ $message }}
-                </p>
-            @enderror
+                </div>
+                <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">Optional — used to filter and group templates.</p>
+                @error('category')
+                    <p class="mt-1 text-xs text-red-500 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
         </div>
 
         {{-- Subject --}}
@@ -135,7 +167,7 @@
     {{-- ─── RIGHT: Settings sidebar ─── --}}
     <div class="space-y-5">
 
-        {{-- Status --}}
+        {{-- Settings: Status --}}
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-5 lg:p-6">
             <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4">Settings</h3>
 

@@ -171,6 +171,120 @@
     @endif
 </div>
 
+{{-- Follow-up Emails card --}}
+@if($followups->isNotEmpty())
+<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-5 lg:p-7 mb-5">
+    <div class="flex items-center gap-2.5 mb-4">
+        <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+        <h3 class="text-[15px] font-bold text-slate-900 dark:text-white">Follow-up Emails</h3>
+        <span class="text-xs text-slate-400 dark:text-slate-500">Only sent to recipients who haven't replied</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-{{ $followups->count() > 1 ? '2' : '1' }} gap-4">
+        @foreach($followups as $fu)
+        @php
+            $fuStatusConfig = [
+                'pending'   => ['bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', 'Pending'],
+                'running'   => ['bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400', 'Running'],
+                'completed' => ['bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400', 'Completed'],
+            ][$fu->status] ?? ['bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', $fu->status];
+
+            $fuProgress = $fu->total_emails > 0
+                ? (int) round(($fu->sent_count + $fu->failed_count) / $fu->total_emails * 100)
+                : 0;
+        @endphp
+        <div class="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                        <span class="text-xs font-black text-violet-700 dark:text-violet-400">{{ $fu->sort_order }}</span>
+                    </div>
+                    <span class="text-sm font-bold text-slate-800 dark:text-slate-200">Follow-up {{ $fu->sort_order }}</span>
+                </div>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold {{ $fuStatusConfig[0] }}">
+                    @if($fu->status === 'running')
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                    @endif
+                    {{ $fuStatusConfig[1] }}
+                </span>
+            </div>
+
+            {{-- Template --}}
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                Template:
+                <span class="font-medium text-slate-700 dark:text-slate-300">
+                    {{ $fu->template?->title ?? 'Same as campaign (auto)' }}
+                </span>
+            </p>
+
+            {{-- Timing info --}}
+            @if($fu->status === 'pending')
+                @if($campaign->status === 'completed' && $campaign->completed_at)
+                <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+                    Scheduled in
+                    <span class="font-semibold text-violet-600 dark:text-violet-400">{{ $fu->delay_days }} day{{ $fu->delay_days !== 1 ? 's' : '' }}</span>
+                    after campaign completed
+                    <span class="text-slate-500 dark:text-slate-400">(around {{ $campaign->completed_at->addDays($fu->delay_days)->format('M j') }})</span>
+                </p>
+                @elseif($fu->sort_order > 1)
+                    @php $prevFu = $followups->where('sort_order', $fu->sort_order - 1)->first(); @endphp
+                    @if($prevFu && $prevFu->completed_at)
+                    <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+                        Scheduled in
+                        <span class="font-semibold text-violet-600 dark:text-violet-400">{{ $fu->delay_days }} day{{ $fu->delay_days !== 1 ? 's' : '' }}</span>
+                        after Follow-up {{ $fu->sort_order - 1 }}
+                        <span class="text-slate-500 dark:text-slate-400">(around {{ $prevFu->completed_at->addDays($fu->delay_days)->format('M j') }})</span>
+                    </p>
+                    @else
+                    <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+                        Triggers <span class="font-semibold text-violet-600 dark:text-violet-400">{{ $fu->delay_days }} day{{ $fu->delay_days !== 1 ? 's' : '' }}</span>
+                        after Follow-up {{ $fu->sort_order - 1 }} completes
+                    </p>
+                    @endif
+                @else
+                <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+                    Triggers <span class="font-semibold text-violet-600 dark:text-violet-400">{{ $fu->delay_days }} day{{ $fu->delay_days !== 1 ? 's' : '' }}</span>
+                    after campaign completes
+                </p>
+                @endif
+            @elseif($fu->status === 'running')
+            <p class="text-xs text-slate-400 dark:text-slate-500 mb-2">
+                Started: <span class="font-medium text-slate-600 dark:text-slate-300">{{ $fu->started_at?->format('M j, Y H:i') ?? '—' }}</span>
+            </p>
+            {{-- Progress bar --}}
+            <div class="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
+                <div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-brand-500 transition-all duration-500"
+                     style="width: {{ $fuProgress }}%"></div>
+            </div>
+            @elseif($fu->status === 'completed')
+            <p class="text-xs text-slate-400 dark:text-slate-500 mb-2">
+                Completed: <span class="font-medium text-slate-600 dark:text-slate-300">{{ $fu->completed_at?->format('M j, Y H:i') ?? '—' }}</span>
+            </p>
+            @endif
+
+            {{-- Stats --}}
+            <div class="grid grid-cols-3 gap-2 mt-2">
+                <div class="rounded-lg bg-slate-50 dark:bg-slate-800 p-2 text-center">
+                    <p class="text-base font-black text-slate-700 dark:text-slate-300 tabular-nums">{{ $fu->total_emails }}</p>
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Target</p>
+                </div>
+                <div class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 p-2 text-center">
+                    <p class="text-base font-black text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fu->sent_count }}</p>
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Sent</p>
+                </div>
+                <div class="rounded-lg bg-red-50 dark:bg-red-900/20 p-2 text-center">
+                    <p class="text-base font-black text-red-700 dark:text-red-400 tabular-nums">{{ $fu->failed_count }}</p>
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Failed</p>
+                </div>
+            </div>
+        </div>
+        @endforeach
+    </div>
+</div>
+@endif
+
 {{-- Recent logs --}}
 <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
     <div class="px-5 lg:px-7 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">

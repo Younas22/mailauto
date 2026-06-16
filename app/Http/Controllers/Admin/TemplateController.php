@@ -16,7 +16,8 @@ class TemplateController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('subject', 'like', "%{$search}%");
+                  ->orWhere('subject', 'like', "%{$search}%")
+                  ->orWhere('category', 'like', "%{$search}%");
             });
         }
 
@@ -24,7 +25,12 @@ class TemplateController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
         $templates = $query->paginate(10)->withQueryString();
+
         return view('admin.templates.index', compact('templates'));
     }
 
@@ -36,17 +42,19 @@ class TemplateController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'title'   => 'required|string|max:255',
-            'subject' => 'required|string|max:255',
-            'body'    => 'required|string',
-            'status'  => 'in:active,inactive',
+            'title'    => 'required|string|max:255',
+            'category' => 'nullable|string|max:100',
+            'subject'  => 'required|string|max:255',
+            'body'     => 'required|string',
+            'status'   => 'in:active,inactive',
         ]);
 
         EmailTemplate::create([
-            'title'   => $request->title,
-            'subject' => $request->subject,
-            'body'    => $request->body,
-            'status'  => $request->status ?? 'active',
+            'title'    => $request->title,
+            'category' => $request->category,
+            'subject'  => $request->subject,
+            'body'     => $request->body,
+            'status'   => $request->status ?? 'active',
         ]);
 
         return redirect()->route('admin.templates.index')
@@ -61,17 +69,19 @@ class TemplateController extends Controller
     public function update(Request $request, EmailTemplate $template)
     {
         $request->validate([
-            'title'   => 'required|string|max:255',
-            'subject' => 'required|string|max:255',
-            'body'    => 'required|string',
-            'status'  => 'in:active,inactive',
+            'title'    => 'required|string|max:255',
+            'category' => 'nullable|string|max:100',
+            'subject'  => 'required|string|max:255',
+            'body'     => 'required|string',
+            'status'   => 'in:active,inactive',
         ]);
 
         $template->update([
-            'title'   => $request->title,
-            'subject' => $request->subject,
-            'body'    => $request->body,
-            'status'  => $request->status ?? 'active',
+            'title'    => $request->title,
+            'category' => $request->category,
+            'subject'  => $request->subject,
+            'body'     => $request->body,
+            'status'   => $request->status ?? 'active',
         ]);
 
         return redirect()->route('admin.templates.index')

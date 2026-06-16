@@ -10,6 +10,7 @@ use App\Models\EmailGroup;
 use App\Models\EmailList;
 use App\Models\EmailTemplate;
 use App\Models\Setting;
+use App\Models\TemplateCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,32 +34,79 @@ class CampaignController extends Controller
 
     public function create(): View
     {
-        $emailGroups    = EmailGroup::withCount(['emails', 'pendingEmails'])->get();
-        $templateCount  = EmailTemplate::where('status', 'active')->count();
+        $emailGroups        = EmailGroup::withCount(['emails', 'pendingEmails'])->get();
+        $templateCount      = EmailTemplate::where('status', 'active')->count();
+        $templates          = EmailTemplate::where('status', 'active')->get(['id', 'title', 'category']);
+        $templateCategories = TemplateCategory::orderBy('name')->get(['id', 'name']);
+        $randomRotation     = Setting::get('campaign_random_rotation', '0') === '1';
+        $dailyLimit         = (int) Setting::get('campaign_daily_limit', 50);
+        $delaySeconds       = $dailyLimit > 0 ? (int) floor(86400 / $dailyLimit) : 86400;
+        $delayLabel         = $this->formatDelay($delaySeconds);
+        $followup1          = null;
+        $followup2          = null;
 
-        return view('admin.campaigns.create', compact('emailGroups', 'templateCount'));
+        return view('admin.campaigns.create', compact(
+            'emailGroups', 'templateCount', 'templates', 'templateCategories',
+            'randomRotation', 'dailyLimit', 'delaySeconds', 'delayLabel',
+            'followup1', 'followup2'
+        ));
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'name'            => 'required|string|max:255',
-            'email_group_id'  => 'required|exists:email_groups,id',
-            'delay_minutes'   => 'required|integer|min:0|max:1440',
-        ]);
+        $randomRotation = Setting::get('campaign_random_rotation', '0') === '1';
+
+        $rules = [
+            'name'                   => 'required|string|max:255',
+            'email_group_id'         => 'required|exists:email_groups,id',
+            'template_category_id'   => 'nullable|exists:template_categories,id',
+            'followup1_enabled'      => 'nullable|boolean',
+            'followup1_template_id'  => 'nullable|exists:email_templates,id',
+            'followup1_days'         => 'nullable|integer|min:1',
+            'followup2_enabled'      => 'nullable|boolean',
+            'followup2_template_id'  => 'nullable|exists:email_templates,id',
+            'followup2_days'         => 'nullable|integer|min:1',
+        ];
+
+        if (!$randomRotation) {
+            $rules['template_id'] = 'required|exists:email_templates,id';
+        }
+
+        $data = $request->validate($rules);
 
         $group       = EmailGroup::findOrFail($data['email_group_id']);
         $totalEmails = $group->pendingEmails()->count();
 
         $campaign = Campaign::create([
-            'name'           => $data['name'],
-            'email_group_id' => $data['email_group_id'],
-            'delay_minutes'  => $data['delay_minutes'],
-            'status'         => 'draft',
-            'total_emails'   => $totalEmails,
-            'sent_count'     => 0,
-            'failed_count'   => 0,
+            'name'                 => $data['name'],
+            'email_group_id'       => $data['email_group_id'],
+            'template_id'          => $randomRotation ? null : ($data['template_id'] ?? null),
+            'template_category_id' => $data['template_category_id'] ?? null,
+            'delay_minutes'        => 0,
+            'status'               => 'draft',
+            'total_emails'         => $totalEmails,
+            'sent_count'           => 0,
+            'failed_count'         => 0,
         ]);
+
+        // Create follow-up records
+        if (!empty($data['followup1_enabled'])) {
+            $fu1 = $campaign->followups()->create([
+                'sort_order'  => 1,
+                'template_id' => $data['followup1_template_id'] ?? null,
+                'delay_days'  => $data['followup1_days'] ?? 3,
+                'status'      => 'pending',
+            ]);
+
+            if (!empty($data['followup2_enabled'])) {
+                $campaign->followups()->create([
+                    'sort_order'  => 2,
+                    'template_id' => $data['followup2_template_id'] ?? null,
+                    'delay_days'  => $data['followup2_days'] ?? 3,
+                    'status'      => 'pending',
+                ]);
+            }
+        }
 
         return redirect()
             ->route('admin.campaigns.show', $campaign)
@@ -71,8 +119,9 @@ class CampaignController extends Controller
         $recentLogs   = $campaign->logs()->with('template')->latest()->limit(50)->get();
         $openedCount  = $campaign->logs()->where('open_count', '>', 0)->count();
         $repliedCount = $campaign->logs()->where('reply_count', '>', 0)->count();
+        $followups    = $campaign->followups()->with('template')->orderBy('sort_order')->get();
 
-        return view('admin.campaigns.show', compact('campaign', 'recentLogs', 'openedCount', 'repliedCount'));
+        return view('admin.campaigns.show', compact('campaign', 'recentLogs', 'openedCount', 'repliedCount', 'followups'));
     }
 
     public function edit(Campaign $campaign): View
@@ -82,9 +131,21 @@ class CampaignController extends Controller
                 ->with('error', 'Only draft or paused campaigns can be edited.');
         }
 
-        $emailGroups = EmailGroup::withCount(['emails', 'pendingEmails'])->get();
+        $emailGroups        = EmailGroup::withCount(['emails', 'pendingEmails'])->get();
+        $templates          = EmailTemplate::where('status', 'active')->get(['id', 'title', 'category']);
+        $templateCategories = TemplateCategory::orderBy('name')->get(['id', 'name']);
+        $randomRotation     = Setting::get('campaign_random_rotation', '0') === '1';
+        $dailyLimit         = (int) Setting::get('campaign_daily_limit', 50);
+        $delaySeconds       = $dailyLimit > 0 ? (int) floor(86400 / $dailyLimit) : 86400;
+        $delayLabel         = $this->formatDelay($delaySeconds);
+        $followup1          = $campaign->followups->where('sort_order', 1)->first();
+        $followup2          = $campaign->followups->where('sort_order', 2)->first();
 
-        return view('admin.campaigns.edit', compact('campaign', 'emailGroups'));
+        return view('admin.campaigns.edit', compact(
+            'campaign', 'emailGroups', 'templates', 'templateCategories',
+            'randomRotation', 'dailyLimit', 'delaySeconds', 'delayLabel',
+            'followup1', 'followup2'
+        ));
     }
 
     public function update(Request $request, Campaign $campaign): RedirectResponse
@@ -93,16 +154,61 @@ class CampaignController extends Controller
             return back()->with('error', 'Only draft or paused campaigns can be edited.');
         }
 
-        $data = $request->validate([
-            'name'           => 'required|string|max:255',
-            'email_group_id' => 'required|exists:email_groups,id',
-            'delay_minutes'  => 'required|integer|min:0|max:1440',
-        ]);
+        $randomRotation = Setting::get('campaign_random_rotation', '0') === '1';
+
+        $rules = [
+            'name'                   => 'required|string|max:255',
+            'email_group_id'         => 'required|exists:email_groups,id',
+            'template_category_id'   => 'nullable|exists:template_categories,id',
+            'followup1_enabled'      => 'nullable|boolean',
+            'followup1_template_id'  => 'nullable|exists:email_templates,id',
+            'followup1_days'         => 'nullable|integer|min:1',
+            'followup2_enabled'      => 'nullable|boolean',
+            'followup2_template_id'  => 'nullable|exists:email_templates,id',
+            'followup2_days'         => 'nullable|integer|min:1',
+        ];
+
+        if (!$randomRotation) {
+            $rules['template_id'] = 'required|exists:email_templates,id';
+        }
+
+        $data = $request->validate($rules);
 
         $group = EmailGroup::findOrFail($data['email_group_id']);
-        $data['total_emails'] = $group->pendingEmails()->count();
+        $data['total_emails']          = $group->pendingEmails()->count();
+        $data['template_id']           = $randomRotation ? null : ($data['template_id'] ?? null);
+        $data['template_category_id']  = $data['template_category_id'] ?? null;
+        $data['delay_minutes']         = 0;
 
-        $campaign->update($data);
+        $campaign->update([
+            'name'                 => $data['name'],
+            'email_group_id'       => $data['email_group_id'],
+            'template_id'          => $data['template_id'],
+            'template_category_id' => $data['template_category_id'],
+            'delay_minutes'        => 0,
+            'total_emails'         => $data['total_emails'],
+        ]);
+
+        // Remove only pending followups (don't touch running/completed)
+        $campaign->followups()->where('status', 'pending')->delete();
+
+        if (!empty($data['followup1_enabled'])) {
+            $campaign->followups()->create([
+                'sort_order'  => 1,
+                'template_id' => $data['followup1_template_id'] ?? null,
+                'delay_days'  => $data['followup1_days'] ?? 3,
+                'status'      => 'pending',
+            ]);
+
+            if (!empty($data['followup2_enabled'])) {
+                $campaign->followups()->create([
+                    'sort_order'  => 2,
+                    'template_id' => $data['followup2_template_id'] ?? null,
+                    'delay_days'  => $data['followup2_days'] ?? 3,
+                    'status'      => 'pending',
+                ]);
+            }
+        }
 
         return redirect()
             ->route('admin.campaigns.show', $campaign)
@@ -133,9 +239,8 @@ class CampaignController extends Controller
             return back()->with('error', "This campaign has {$pendingCount} pending emails which exceeds the configured limit of {$maxPerCampaign}. Reduce the group size or increase the limit in Settings → Campaign.");
         }
 
-        $delay = $campaign->delay_minutes > 0
-            ? $campaign->delay_minutes
-            : (int) Setting::get('campaign_delay', 5);
+        $delaySeconds = (int) Setting::get('campaign_delay', 1728);
+        $delayLabel   = $this->formatDelay($delaySeconds);
 
         $campaign->update([
             'status'       => 'running',
@@ -143,13 +248,9 @@ class CampaignController extends Controller
             'started_at'   => $campaign->started_at ?? now(),
         ]);
 
-        // Dispatch a single chunk-dispatcher job rather than flooding the queue with
-        // one job per email. Each chunk job fetches the next slice, dispatches its
-        // send jobs, then chains the following chunk dispatcher — keeping at most
-        // chunkSize + 1 jobs in the queue at any time.
         ProcessCampaignChunkJob::dispatch($campaign->id);
 
-        return back()->with('success', "Campaign launched! {$pendingCount} emails will be queued in chunks with {$delay} min delay between each.");
+        return back()->with('success', "Campaign launched! {$pendingCount} emails will be queued with {$delayLabel} between each.");
     }
 
     public function pause(Campaign $campaign): RedirectResponse
@@ -199,5 +300,19 @@ class CampaignController extends Controller
         return redirect()
             ->route('admin.campaigns.index')
             ->with('success', 'Campaign deleted.');
+    }
+
+    private function formatDelay(int $seconds): string
+    {
+        if ($seconds >= 3600) {
+            $h = intdiv($seconds, 3600);
+            $m = intdiv($seconds % 3600, 60);
+            return $m > 0 ? "{$h}h {$m}m" : "{$h} hour" . ($h !== 1 ? 's' : '');
+        }
+        if ($seconds >= 60) {
+            $m = intdiv($seconds, 60);
+            return "{$m} minute" . ($m !== 1 ? 's' : '');
+        }
+        return "{$seconds} second" . ($seconds !== 1 ? 's' : '');
     }
 }

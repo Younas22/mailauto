@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Admin\TemplateController;
+use App\Http\Controllers\Admin\TemplateCategoryController;
 use App\Http\Controllers\Admin\EmailListController;
 use App\Http\Controllers\Admin\CampaignController;
 use App\Http\Controllers\Admin\EmailLogController;
@@ -48,6 +49,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Email Templates
     Route::resource('templates', TemplateController::class)->except(['show']);
+    Route::resource('template-categories', TemplateCategoryController::class)->except(['show', 'create', 'edit']);
 
     // Email Lists & Groups
     Route::get('/email-lists',          [EmailListController::class, 'index'])->name('email-lists.index');

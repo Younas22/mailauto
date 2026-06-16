@@ -38,13 +38,22 @@
             <span class="font-bold text-slate-800 dark:text-slate-200">{{ $templates->total() }}</span> templates total
         </p>
     </div>
-    <a href="{{ route('admin.templates.create') }}"
-       class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-brand-300/30 hover:-translate-y-0.5 hover:shadow-md">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        New Template
-    </a>
+    <div class="flex items-center gap-2">
+        <a href="{{ route('admin.template-categories.index') }}"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-semibold rounded-xl transition border border-slate-200 dark:border-slate-700">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+            </svg>
+            Categories
+        </a>
+        <a href="{{ route('admin.templates.create') }}"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-brand-300/30 hover:-translate-y-0.5 hover:shadow-md">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Template
+        </a>
+    </div>
 </div>
 
 {{-- Search & Filter bar --}}
@@ -60,8 +69,22 @@
                    class="bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 outline-none w-full" />
         </div>
         <div class="relative flex-shrink-0">
+            @php $filterCategories = \App\Models\TemplateCategory::orderBy('name')->pluck('name'); @endphp
+            <select name="category"
+                    class="appearance-none w-full sm:w-44 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                           text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer focus:border-brand-400 transition">
+                <option value="">All Categories</option>
+                @foreach($filterCategories as $cat)
+                <option value="{{ $cat }}" {{ request('category') === $cat ? 'selected' : '' }}>{{ $cat }}</option>
+                @endforeach
+            </select>
+            <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </div>
+        <div class="relative flex-shrink-0">
             <select name="status"
-                    class="appearance-none w-full sm:w-40 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                    class="appearance-none w-full sm:w-36 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
                            text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer focus:border-brand-400 transition">
                 <option value="">All Statuses</option>
                 <option value="active"   {{ request('status') === 'active'   ? 'selected' : '' }}>Active</option>
@@ -76,7 +99,7 @@
                     class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
                 Search
             </button>
-            @if(request('search') || request('status'))
+            @if(request('search') || request('status') || request('category'))
             <a href="{{ route('admin.templates.index') }}"
                class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700
                       text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition border border-slate-200 dark:border-slate-700">
@@ -94,6 +117,7 @@
             <tr class="bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">#</th>
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Title</th>
+                <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Category</th>
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Subject</th>
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created</th>
@@ -114,6 +138,15 @@
                         </div>
                         <span class="font-semibold text-slate-800 dark:text-slate-200">{{ $template->title }}</span>
                     </div>
+                </td>
+                <td class="px-6 py-4">
+                    @if($template->category)
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-100 dark:border-violet-800/40">
+                            {{ $template->category }}
+                        </span>
+                    @else
+                        <span class="text-slate-300 dark:text-slate-600 text-xs">—</span>
+                    @endif
                 </td>
                 <td class="px-6 py-4 text-slate-500 dark:text-slate-400 max-w-xs truncate">{{ $template->subject }}</td>
                 <td class="px-6 py-4">
@@ -155,7 +188,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="6" class="px-6 py-16 text-center">
+                <td colspan="7" class="px-6 py-16 text-center">
                     <div class="flex flex-col items-center gap-3">
                         <div class="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                             <svg class="w-7 h-7 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,6 +267,13 @@
                 </span>
             @endif
         </div>
+        @if($template->category)
+        <div class="mb-2">
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-100 dark:border-violet-800/40">
+                {{ $template->category }}
+            </span>
+        </div>
+        @endif
         <p class="text-xs text-slate-500 dark:text-slate-400 mb-3 truncate">
             <span class="font-medium text-slate-600 dark:text-slate-300">Subject:</span> {{ $template->subject }}
         </p>

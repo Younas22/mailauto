@@ -37,9 +37,8 @@ class ProcessCampaignChunkJob implements ShouldQueue
 
         if ($campaign->status !== 'running') return;
 
-        $delay = $campaign->delay_minutes > 0
-            ? $campaign->delay_minutes
-            : (int) Setting::get('campaign_delay', 5);
+        // Delay is always driven by the global setting (in seconds).
+        $delay = (int) Setting::get('campaign_delay', 1728);
 
         // Fetch next slice of pending emails ordered by ID (ID cursor, not offset).
         // Ordering by ID is stable even if earlier rows change status between chunks.
@@ -53,18 +52,18 @@ class ProcessCampaignChunkJob implements ShouldQueue
         if ($chunk->isEmpty()) return;
 
         // Dispatch send jobs staggered within this chunk.
-        // Index 0 fires immediately; index N fires at N × delay minutes from now.
-        // The next chunk dispatcher is scheduled at chunkSize × delay minutes,
+        // Index 0 fires immediately; index N fires at N × delay seconds from now.
+        // The next chunk dispatcher is scheduled at chunkSize × delay seconds,
         // so email spacing is continuous across chunk boundaries.
         foreach ($chunk as $index => $emailItem) {
             SendCampaignEmailJob::dispatch($this->campaignId, $emailItem->id)
-                ->delay(now()->addMinutes($index * $delay));
+                ->delay(now()->addSeconds($index * $delay));
         }
 
         // If we filled the chunk there are likely more emails — chain the next dispatcher.
         if ($chunk->count() === $this->chunkSize) {
             static::dispatch($this->campaignId, $chunk->last()->id, $this->chunkSize)
-                ->delay(now()->addMinutes($this->chunkSize * $delay));
+                ->delay(now()->addSeconds($this->chunkSize * $delay));
         }
     }
 }

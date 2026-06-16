@@ -886,25 +886,43 @@
 
                     <div class="p-6 space-y-6">
                         {{-- Sending limits --}}
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div x-data="{
+                            dailyLimit: {{ old('campaign_daily_limit', $settings['campaign_daily_limit'] ?? '50') }},
+                            get delaySeconds() {
+                                let n = Math.max(1, Math.min(50, parseInt(this.dailyLimit) || 1));
+                                return Math.floor(86400 / n);
+                            },
+                            get delayLabel() {
+                                let s = this.delaySeconds;
+                                if (s >= 3600) {
+                                    let h = Math.floor(s / 3600);
+                                    let m = Math.floor((s % 3600) / 60);
+                                    return m > 0 ? (h + 'h ' + m + 'm') : (h + ' hour' + (h !== 1 ? 's' : ''));
+                                } else if (s >= 60) {
+                                    let m = Math.floor(s / 60);
+                                    return m + ' minute' + (m !== 1 ? 's' : '');
+                                }
+                                return s + ' second' + (s !== 1 ? 's' : '');
+                            }
+                        }" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Delay Between Emails <span class="text-slate-400 font-normal">(seconds)</span></label>
-                                <input type="number" name="campaign_delay" min="1" max="3600"
-                                       value="{{ old('campaign_delay', $settings['campaign_delay'] ?? '5') }}"
-                                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none">
-                                @error('campaign_delay')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Delay Between Emails</label>
+                                <input type="hidden" name="campaign_delay" :value="delaySeconds">
+                                <div class="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-500 dark:text-slate-400 select-none" x-text="delayLabel"></div>
+                                <p class="mt-1 text-[11px] text-slate-400 dark:text-slate-500">Auto-calculated from daily limit</p>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Daily Email Limit</label>
-                                <input type="number" name="campaign_daily_limit" min="1"
-                                       value="{{ old('campaign_daily_limit', $settings['campaign_daily_limit'] ?? '500') }}"
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Daily Email Limit <span class="text-red-400 font-normal">(max 50)</span></label>
+                                <input type="number" name="campaign_daily_limit" min="1" max="50"
+                                       x-model="dailyLimit"
+                                       @input="dailyLimit = Math.min(50, Math.max(1, parseInt($event.target.value) || 1))"
                                        class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none">
                                 @error('campaign_daily_limit')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Max Emails Per Campaign</label>
                                 <input type="number" name="campaign_max_per_campaign" min="1"
-                                       value="{{ old('campaign_max_per_campaign', $settings['campaign_max_per_campaign'] ?? '10000') }}"
+                                       value="{{ old('campaign_max_per_campaign', $settings['campaign_max_per_campaign'] ?? '500') }}"
                                        class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400 transition outline-none">
                                 @error('campaign_max_per_campaign')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
                             </div>

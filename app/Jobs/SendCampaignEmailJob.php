@@ -85,10 +85,21 @@ class SendCampaignEmailJob implements ShouldQueue
         }
         RateLimiter::hit($rateKey, 1);
 
-        // Template selection: random rotation only when the setting is enabled
+        // Template selection: random rotation when enabled, otherwise use campaign's pinned template
         $useRandom = Setting::get('campaign_random_rotation', '0') === '1';
-        $query     = EmailTemplate::where('status', 'active');
-        $template  = $useRandom ? $query->inRandomOrder()->first() : $query->first();
+        if ($useRandom) {
+            $query = EmailTemplate::where('status', 'active');
+            if ($campaign->template_category_id) {
+                $catName = \App\Models\TemplateCategory::find($campaign->template_category_id)?->name;
+                if ($catName) $query->where('category', $catName);
+            }
+            $template = $query->inRandomOrder()->first();
+        } elseif ($campaign->template_id) {
+            $template = EmailTemplate::where('id', $campaign->template_id)->where('status', 'active')->first()
+                     ?? EmailTemplate::where('status', 'active')->first(); // fallback if pinned template was deactivated
+        } else {
+            $template = EmailTemplate::where('status', 'active')->first();
+        }
 
         if (!$template) {
             $this->logResult($campaign->id, $emailItem, null, 'failed', 'No active templates found');
@@ -217,6 +228,12 @@ class SendCampaignEmailJob implements ShouldQueue
                 'status'       => 'completed',
                 'completed_at' => now(),
             ]);
+            // Trigger follow-up 1 if it exists and is still pending
+            $followup = $campaign->followups()->where('sort_order', 1)->where('status', 'pending')->first();
+            if ($followup) {
+                \App\Jobs\ProcessFollowupChunkJob::dispatch($followup->id)
+                    ->delay(now()->addDays($followup->delay_days));
+            }
         }
     }
 }

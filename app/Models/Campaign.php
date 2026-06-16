@@ -11,6 +11,8 @@ class Campaign extends Model
     protected $fillable = [
         'name',
         'email_group_id',
+        'template_id',
+        'template_category_id',
         'delay_minutes',
         'status',
         'total_emails',
@@ -28,6 +30,21 @@ class Campaign extends Model
     public function emailGroup(): BelongsTo
     {
         return $this->belongsTo(EmailGroup::class, 'email_group_id');
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(EmailTemplate::class, 'template_id');
+    }
+
+    public function templateCategory(): BelongsTo
+    {
+        return $this->belongsTo(TemplateCategory::class, 'template_category_id');
+    }
+
+    public function followups(): HasMany
+    {
+        return $this->hasMany(CampaignFollowup::class);
     }
 
     public function logs(): HasMany

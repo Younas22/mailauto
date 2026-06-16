@@ -9,6 +9,7 @@ class CampaignLog extends Model
 {
     protected $fillable = [
         'campaign_id',
+        'followup_id',
         'email_list_id',
         'email_template_id',
         'email',

@@ -311,12 +311,14 @@ class SettingsController extends Controller
     public function updateCampaign(Request $request): \Illuminate\Http\RedirectResponse
     {
         $data = $request->validate([
-            'campaign_delay'            => 'required|integer|min:1|max:3600',
-            'campaign_daily_limit'      => 'required|integer|min:1|max:100000',
+            'campaign_daily_limit'      => 'required|integer|min:1|max:50',
             'campaign_max_per_campaign' => 'required|integer|min:1',
             'campaign_random_rotation'  => 'boolean',
             'campaign_retry_failed'     => 'boolean',
         ]);
+
+        // Spread emails evenly across 24 hours
+        $data['campaign_delay'] = (int) floor(86400 / $data['campaign_daily_limit']);
 
         $data['campaign_random_rotation'] = $request->boolean('campaign_random_rotation') ? '1' : '0';
         $data['campaign_retry_failed']    = $request->boolean('campaign_retry_failed') ? '1' : '0';
