@@ -120,6 +120,7 @@
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Category</th>
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Subject</th>
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                <th class="text-center px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Opens</th>
                 <th class="text-left px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created</th>
                 <th class="text-right px-6 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
@@ -160,6 +161,15 @@
                         </span>
                     @endif
                 </td>
+                <td class="px-6 py-4 text-center">
+                    @if(($template->total_opens ?? 0) > 0)
+                        <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400">
+                            {{ $template->total_opens }}
+                        </span>
+                    @else
+                        <span class="text-slate-300 dark:text-slate-600 text-xs">—</span>
+                    @endif
+                </td>
                 <td class="px-6 py-4 text-slate-400 dark:text-slate-500 text-xs">{{ $template->created_at->format('M d, Y') }}</td>
                 <td class="px-6 py-4">
                     <div class="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -188,7 +198,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="7" class="px-6 py-16 text-center">
+                <td colspan="8" class="px-6 py-16 text-center">
                     <div class="flex flex-col items-center gap-3">
                         <div class="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                             <svg class="w-7 h-7 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -10,7 +10,7 @@ class TemplateController extends Controller
 {
     public function index(Request $request)
     {
-        $query = EmailTemplate::latest();
+        $query = EmailTemplate::selectRaw('email_templates.*, (SELECT COUNT(*) FROM campaign_logs WHERE campaign_logs.email_template_id = email_templates.id AND campaign_logs.open_count > 0) as total_opens')->latest();
 
         if ($request->filled('search')) {
             $search = $request->search;

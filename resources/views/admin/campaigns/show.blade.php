@@ -285,6 +285,60 @@
 </div>
 @endif
 
+{{-- Template Performance --}}
+@if($usedTemplates->isNotEmpty())
+<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-5 lg:p-7 mb-5">
+    <div class="flex items-center gap-2.5 mb-4">
+        <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        <h3 class="text-[15px] font-bold text-slate-900 dark:text-white">Template Performance</h3>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+        <div class="relative">
+            <select id="template-select"
+                    class="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                           text-sm text-slate-700 dark:text-slate-200 rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer
+                           focus:border-brand-400 transition min-w-[220px]">
+                <option value="">— Select a template —</option>
+                @foreach($usedTemplates as $tplId => $tpl)
+                <option value="{{ $tplId }}">{{ $tpl->title }}</option>
+                @endforeach
+            </select>
+            <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </div>
+        <button id="filter-reset-btn" onclick="clearTplFilter()"
+                class="hidden text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+            Clear filter ✕
+        </button>
+    </div>
+
+    <div id="template-stats-cards" class="hidden grid grid-cols-3 gap-3">
+        <button data-filter="all"
+                class="tpl-stat-card rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-4 text-center w-full transition hover:ring-2 hover:ring-emerald-300 dark:hover:ring-emerald-700">
+            <p class="text-2xl font-black text-emerald-700 dark:text-emerald-400 tabular-nums" id="tpl-sent">0</p>
+            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wide">Sent</p>
+        </button>
+        <button data-filter="open"
+                class="tpl-stat-card rounded-xl bg-violet-50 dark:bg-violet-900/20 p-4 text-center w-full transition hover:ring-2 hover:ring-violet-300 dark:hover:ring-violet-700">
+            <p class="text-2xl font-black text-violet-700 dark:text-violet-400 tabular-nums" id="tpl-opens">0</p>
+            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wide">Opens</p>
+        </button>
+        <button data-filter="reply"
+                class="tpl-stat-card rounded-xl bg-teal-50 dark:bg-teal-900/20 p-4 text-center w-full transition hover:ring-2 hover:ring-teal-300 dark:hover:ring-teal-700">
+            <p class="text-2xl font-black text-teal-700 dark:text-teal-400 tabular-nums" id="tpl-replies">0</p>
+            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wide">Replies</p>
+        </button>
+    </div>
+</div>
+<script>
+window.__tplStats = @json($templateStats->map(fn($s) => ['sent' => (int)$s->total_sent, 'opens' => (int)$s->total_opens, 'replies' => (int)$s->total_replies])->toArray());
+</script>
+@endif
+
 {{-- Recent logs --}}
 <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
     <div class="px-5 lg:px-7 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -319,7 +373,10 @@
             </thead>
             <tbody class="divide-y divide-slate-50 dark:divide-slate-800/60">
                 @foreach($recentLogs as $log)
-                <tr class="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors">
+                <tr class="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors log-row"
+                    data-template-id="{{ $log->email_template_id ?? '' }}"
+                    data-open="{{ $log->open_count > 0 ? '1' : '0' }}"
+                    data-reply="{{ $log->reply_count > 0 ? '1' : '0' }}">
                     <td class="px-5 py-3.5">
                         <p class="font-medium text-slate-800 dark:text-slate-200 text-sm">{{ $log->email }}</p>
                     </td>
@@ -460,6 +517,81 @@
     let timer = null;
     if (initialStatus === 'running' || initialStatus === 'paused') {
         timer = setInterval(poll, 3000);
+    }
+})();
+
+// Template performance filter
+(function () {
+    if (!window.__tplStats) return;
+
+    const tplSelect  = document.getElementById('template-select');
+    const statsCards = document.getElementById('template-stats-cards');
+    const tplSent    = document.getElementById('tpl-sent');
+    const tplOpens   = document.getElementById('tpl-opens');
+    const tplReplies = document.getElementById('tpl-replies');
+    const resetBtn   = document.getElementById('filter-reset-btn');
+    const logRows    = document.querySelectorAll('.log-row');
+    const statBtns   = document.querySelectorAll('.tpl-stat-card');
+
+    let activeTemplateId = null;
+    let activeFilter     = null;
+
+    tplSelect && tplSelect.addEventListener('change', function () {
+        activeTemplateId = this.value || null;
+        activeFilter     = null;
+        setActiveCard(null);
+        updateStatCards();
+        applyFilter();
+    });
+
+    statBtns.forEach(btn => btn.addEventListener('click', function () {
+        const f = this.dataset.filter;
+        activeFilter = (activeFilter === f) ? null : f;
+        setActiveCard(activeFilter);
+        applyFilter();
+    }));
+
+    function updateStatCards() {
+        if (!activeTemplateId || !window.__tplStats[activeTemplateId]) {
+            statsCards && statsCards.classList.add('hidden');
+            return;
+        }
+        const s = window.__tplStats[activeTemplateId];
+        if (tplSent)    tplSent.textContent    = s.sent;
+        if (tplOpens)   tplOpens.textContent   = s.opens;
+        if (tplReplies) tplReplies.textContent = s.replies;
+        statsCards && statsCards.classList.remove('hidden');
+    }
+
+    function applyFilter() {
+        logRows.forEach(row => {
+            if (!activeTemplateId) { row.style.display = ''; return; }
+            if (String(row.dataset.templateId) !== String(activeTemplateId)) { row.style.display = 'none'; return; }
+            if (activeFilter === 'open'  && row.dataset.open  !== '1') { row.style.display = 'none'; return; }
+            if (activeFilter === 'reply' && row.dataset.reply !== '1') { row.style.display = 'none'; return; }
+            row.style.display = '';
+        });
+        resetBtn && resetBtn.classList.toggle('hidden', !activeTemplateId);
+    }
+
+    window.clearTplFilter = function () {
+        if (tplSelect) tplSelect.value = '';
+        activeTemplateId = null;
+        activeFilter     = null;
+        setActiveCard(null);
+        statsCards && statsCards.classList.add('hidden');
+        logRows.forEach(row => row.style.display = '');
+        resetBtn && resetBtn.classList.add('hidden');
+    };
+
+    const ringMap = { all: 'ring-emerald-400', open: 'ring-violet-400', reply: 'ring-teal-400' };
+    function setActiveCard(filter) {
+        statBtns.forEach(btn => {
+            const isActive = btn.dataset.filter === filter;
+            btn.classList.toggle('ring-2', isActive);
+            Object.values(ringMap).forEach(c => btn.classList.remove(c));
+            if (isActive && ringMap[filter]) btn.classList.add(ringMap[filter]);
+        });
     }
 })();
 </script>

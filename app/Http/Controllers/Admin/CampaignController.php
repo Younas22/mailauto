@@ -121,7 +121,16 @@ class CampaignController extends Controller
         $repliedCount = $campaign->logs()->where('reply_count', '>', 0)->count();
         $followups    = $campaign->followups()->with('template')->orderBy('sort_order')->get();
 
-        return view('admin.campaigns.show', compact('campaign', 'recentLogs', 'openedCount', 'repliedCount', 'followups'));
+        $templateStats = $campaign->logs()
+            ->whereNotNull('email_template_id')
+            ->selectRaw('email_template_id, COUNT(*) as total_sent, SUM(CASE WHEN open_count > 0 THEN 1 ELSE 0 END) as total_opens, SUM(CASE WHEN reply_count > 0 THEN 1 ELSE 0 END) as total_replies')
+            ->groupBy('email_template_id')
+            ->get()
+            ->keyBy('email_template_id');
+
+        $usedTemplates = EmailTemplate::whereIn('id', $templateStats->keys())->get()->keyBy('id');
+
+        return view('admin.campaigns.show', compact('campaign', 'recentLogs', 'openedCount', 'repliedCount', 'followups', 'templateStats', 'usedTemplates'));
     }
 
     public function edit(Campaign $campaign): View
