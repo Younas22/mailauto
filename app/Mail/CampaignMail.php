@@ -61,7 +61,17 @@ class CampaignMail extends Mailable
             $body .= '<img src="' . $pixelUrl . '" width="1" height="1" style="display:none;border:0" alt="">';
         }
 
-        return ['subject' => $this->template->subject, 'html' => $body];
+        $subject = $this->template->subject;
+
+        if ($this->recipientName) {
+            $subject = str_replace(['{{name}}', '{{ name }}'], $this->recipientName, $subject);
+        }
+
+        if ($this->recipientEmail) {
+            $subject = str_replace(['{{email}}', '{{ email }}'], $this->recipientEmail, $subject);
+        }
+
+        return ['subject' => $subject, 'html' => $body];
     }
 
     public function build(): static
